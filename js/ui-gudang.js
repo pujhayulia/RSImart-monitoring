@@ -57,7 +57,7 @@ export function renderStokProdukFormInputs(existingStok) {
     const cur = (existingStok && existingStok[p.id] !== undefined && existingStok[p.id] !== null) ? existingStok[p.id] : '';
     return `
     <div class="form-field">
-      <label>${p.name} — ${p.size} (${p.satuan})</label>
+      <label for="stokProduk_${p.id}">${p.name} — ${p.size} (${p.satuan})</label>
       <input type="number" id="stokProduk_${p.id}" value="${cur}" placeholder="-">
     </div>`;
   }).join('');

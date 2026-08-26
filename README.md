@@ -7,7 +7,7 @@ yang sama — dari HP atau lokasi mana pun.
 
 ## Isi folder
 
-```
+```text
 index.html                 → struktur halaman
 style.css                   → tampilan/desain
 README.md                   → panduan ini
@@ -62,25 +62,25 @@ sembarang orang dari luar situs Anda.
 1. Masih di **Firestore Database**, buka tab **Rules**.
 2. Ganti isinya dengan:
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /rekap/{date} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-    match /pengiriman/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-    match /lokasi/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-  }
-}
-```
+   ```text
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /rekap/{date} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /pengiriman/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /lokasi/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+     }
+   }
+   ```
 
 3. Klik **Publish**.
 

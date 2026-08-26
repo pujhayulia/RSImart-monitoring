@@ -55,7 +55,7 @@ export function renderDistItemHtml(it, opts = {}) {
 
   const payAction = lunas
     ? `<span class="pay-badge lunas">Lunas${it.metodeBayar ? ' · ' + escapeHtml(it.metodeBayar) : ''}</span>`
-    : `<select class="metode-mini" data-metodefor="${it.id}">${METODE_OPTIONS}</select>
+    : `<select class="metode-mini" data-metodefor="${it.id}" aria-label="Metode pembayaran">${METODE_OPTIONS}</select>
        <button class="pay-badge belum" data-id="${it.id}">Tandai Lunas</button>`;
 
   return `

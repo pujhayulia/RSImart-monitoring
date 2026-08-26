@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rumah Sehat Indonesia — Katalog, Stok & Keuangan</title>
 <meta name="description" content="Katalog produk, stok Gudang RSI, pencatatan distribusi pengiriman, dan rekap keuangan otomatis untuk Yayasan Rumah Sehat Indonesia (ARSI).">
-<meta name="theme-color" content="#0F4C82">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E%F0%9F%92%A7%3C/text%3E%3C/svg%3E">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHRleHQgeT0iMjAiIGZvbnQtc2l6ZT0iMjAiPvCfkqc8L3RleHQ+PC9zdmc+">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -24,15 +24,15 @@
 
     <form id="authForm">
       <div class="auth-field">
-        <label>Email</label>
+        <label for="authEmail">Email</label>
         <input type="email" id="authEmail" required autocomplete="email">
       </div>
       <div class="auth-field">
-        <label>Kata Sandi</label>
+        <label for="authPassword">Kata Sandi</label>
         <input type="password" id="authPassword" required minlength="6" autocomplete="current-password">
       </div>
       <div class="auth-field hidden" id="authConfirmWrap">
-        <label>Ulangi Kata Sandi</label>
+        <label for="authPasswordConfirm">Ulangi Kata Sandi</label>
         <input type="password" id="authPasswordConfirm" minlength="6" autocomplete="new-password">
       </div>
       <div class="auth-error hidden" id="authError"></div>
@@ -100,7 +100,7 @@
 
     <div class="rekap-top">
       <div>
-        <label class="inline-label">Tanggal:</label>
+        <label class="inline-label" for="rekapDateSelect">Tanggal:</label>
         <select id="rekapDateSelect"></select>
       </div>
       <button class="btn" id="btnToggleForm">+ Update Stok Gudang</button>
@@ -132,10 +132,10 @@
     <div class="form-panel" id="formPanel">
       <b class="form-panel-title">Update Stok Gudang RSI</b>
       <div class="form-grid">
-        <div class="form-field"><label>Tanggal</label><input type="date" id="newRekapDate"></div>
-        <div class="form-field"><label>Stok Isi Galon</label><input type="number" id="gudangIsi" placeholder="-"></div>
-        <div class="form-field"><label>Stok Kosong Galon</label><input type="number" id="gudangKosong" placeholder="-"></div>
-        <div class="form-field"><label>Peredaran Galon</label><input type="number" id="gudangPeredaran" placeholder="-"></div>
+        <div class="form-field"><label for="newRekapDate">Tanggal</label><input type="date" id="newRekapDate"></div>
+        <div class="form-field"><label for="gudangIsi">Stok Isi Galon</label><input type="number" id="gudangIsi" placeholder="-"></div>
+        <div class="form-field"><label for="gudangKosong">Stok Kosong Galon</label><input type="number" id="gudangKosong" placeholder="-"></div>
+        <div class="form-field"><label for="gudangPeredaran">Peredaran Galon</label><input type="number" id="gudangPeredaran" placeholder="-"></div>
       </div>
       <div class="hint hint--first">Stok produk lain (satuan sesuai produk):</div>
       <div class="form-grid" id="stokProdukFormGrid"></div>
@@ -159,42 +159,42 @@
         <h3>Catat Pengiriman Baru</h3>
         <p class="tip">Pilih lokasi yang sudah ada, atau ketik tujuan baru — otomatis tersimpan.</p>
         <div class="dist-field">
-          <label>Tanggal Pesan</label>
+          <label for="distTanggalPesan">Tanggal Pesan</label>
           <input type="date" id="distTanggalPesan">
         </div>
         <div class="dist-field">
-          <label>Tanggal Kirim</label>
+          <label for="distTanggalKirim">Tanggal Kirim</label>
           <input type="date" id="distTanggalKirim">
         </div>
         <div class="dist-field">
-          <label>Tujuan Pengiriman</label>
+          <label for="distTujuan">Tujuan Pengiriman</label>
           <input list="lokasiList" id="distTujuan" placeholder="Contoh: Dapur Nambo / lokasi baru...">
           <datalist id="lokasiList"></datalist>
         </div>
         <div class="dist-field">
-          <label>Produk</label>
+          <label for="distProduk">Produk</label>
           <select id="distProduk"></select>
         </div>
         <div class="dist-field hidden" id="distTipeHargaWrap">
-          <label>Tipe Harga</label>
+          <label for="distTipeHarga">Tipe Harga</label>
           <select id="distTipeHarga"></select>
         </div>
         <div class="dist-field">
-          <label>Jumlah Terkirim</label>
+          <label for="distJumlah">Jumlah Terkirim</label>
           <div class="dist-jumlah-row">
             <input type="number" id="distJumlah" placeholder="0">
             <span id="distSatuan" class="dist-satuan">galon</span>
           </div>
         </div>
         <div class="dist-field">
-          <label>Status Pembayaran</label>
+          <label for="distDibayar">Status Pembayaran</label>
           <select id="distDibayar">
             <option value="belum">Belum Dibayar</option>
             <option value="sudah">Sudah Dibayar</option>
           </select>
         </div>
         <div class="dist-field hidden" id="distMetodeWrap">
-          <label>Metode Pembayaran</label>
+          <label for="distMetodeBayar">Metode Pembayaran</label>
           <select id="distMetodeBayar">
             <option value="Tunai">Tunai</option>
             <option value="Transfer">Transfer</option>
@@ -202,7 +202,7 @@
           </select>
         </div>
         <div class="dist-field">
-          <label>Keterangan (opsional)</label>
+          <label for="distKeterangan">Keterangan (opsional)</label>
           <textarea id="distKeterangan" rows="2" placeholder="Mis. nama pengantar, catatan tambahan"></textarea>
         </div>
         <div class="estimasi-box">
@@ -214,7 +214,7 @@
       </div>
       <div>
         <div class="dist-filter-row">
-          <select id="distFilterProduk"></select>
+          <select id="distFilterProduk" aria-label="Filter produk pada log pengiriman"></select>
         </div>
         <div class="dist-log" id="distLog"></div>
       </div>
