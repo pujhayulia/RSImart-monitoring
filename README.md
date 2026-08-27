@@ -1,9 +1,28 @@
-# Monitoring Stok & Distribusi ARSI — Rumah Sehat Indonesia
+# Monitoring Operasional — Yayasan Rumah Sehat Indonesia
 
-Website untuk katalog produk, rekap stok galon harian per lokasi, dan pencatatan
-distribusi pengiriman. Data tersimpan di **Firebase (Firestore)** secara
+Website untuk katalog produk, rekap stok galon harian, pencatatan distribusi
+pengiriman, koperasi bahan makanan (pembelian & distribusi ke SPPG), dan rekap
+keuangan otomatis. Data tersimpan di **Firebase (Firestore)** secara
 real-time, jadi semua orang yang membuka situs ini melihat dan mengisi data
 yang sama — dari HP atau lokasi mana pun.
+
+Setelah login, pengguna memilih salah satu dari **dua modul yang sepenuhnya
+terpisah** — datanya sendiri-sendiri, tidak tercampur:
+
+- **Web RSI**: Beranda, Katalog Produk, Stok Gudang RSI, Distribusi, Keuangan.
+- **Koperasi Bahan Makanan**: Beranda, Pembelian Bahan Makanan, Distribusi ke
+  SPPG, Laporan Keuangan Koperasi.
+
+Di dalam sebuah modul, tiap fitur terasa seperti halaman sendiri (URL berubah,
+mis. `#/rsi/katalog` atau `#/koperasi/pembelian`) tanpa reload halaman, supaya
+data real-time dan sesi login tetap lancar. Ada tombol **"Ganti Modul"** di
+sidebar untuk kembali ke layar pilih modul kapan saja.
+
+Semua tambah/ubah/hapus data tercatat otomatis di halaman **"Riwayat
+Aktivitas"** (bisa diakses dari kedua modul) — mencatat siapa (email akun),
+kapan, dan perubahan apa, termasuk jejak data yang sudah dihapus. Setiap baris
+data di modul lain juga menampilkan "Diinput oleh ..." dengan email akun yang
+sedang login saat menyimpan.
 
 ## Isi folder
 
@@ -13,17 +32,26 @@ style.css                   → tampilan/desain
 README.md                   → panduan ini
 js/
   main.js                    → titik masuk aplikasi (inisialisasi Firebase & wiring UI)
+  router.js                   → navigasi sadar-modul (sidebar, hash URL "#/modul/halaman", tanpa reload)
+  activity-log.js             → catat & tampilkan Riwayat Aktivitas (siapa, kapan, apa)
+  csv-export.js                → bangun & unduh file CSV (tanpa library eksternal)
+  print-report.js              → cetak laporan jadi PDF lewat "Print > Save as PDF" browser
   firebase-config.js         → tempat Anda menempel konfigurasi Firebase
-  state.js                   → state bersama antar modul (koneksi Firebase, cache data)
+  state.js                   → state bersama antar modul (koneksi Firebase, modul aktif, cache data)
   data.js                    → daftar produk, harga, dan data awal (seed)
-  utils.js                   → fungsi bantu (format tanggal/rupiah, escaping)
+  utils.js                   → fungsi bantu (format tanggal/rupiah/jam, escaping, filter rentang tanggal)
   auth.js                    → layar login / daftar / lupa kata sandi
+  ui-beranda.js                → Beranda modul Web RSI
   ui-katalog.js               → render Katalog Produk
   ui-gudang.js                → render & simpan Stok Gudang RSI
   ui-lokasi.js                → daftar lokasi tujuan pengiriman (dinamis)
   ui-distribusi.js            → form & log Distribusi/Pengiriman
   ui-dist-item.js             → komponen baris pengiriman (dipakai Distribusi & Piutang)
   ui-keuangan.js               → Rekap Keuangan (dihitung otomatis dari pengiriman)
+  ui-beranda-koperasi.js       → Beranda modul Koperasi Bahan Makanan
+  ui-pembelian.js              → Koperasi: pembelian bahan makanan dari toko/supplier
+  ui-distribusi-sppg.js        → Koperasi: distribusi/penjualan bahan makanan ke SPPG
+  ui-laporan-keuangan-koperasi.js → Koperasi: gabungan Pembelian+Distribusi, buku kas, ekspor PDF/CSV
 ```
 
 Situs ini murni HTML/CSS/JS modul ES (tanpa proses build/bundler), jadi bisa
@@ -75,6 +103,18 @@ sembarang orang dari luar situs Anda.
          allow write: if request.auth != null;
        }
        match /lokasi/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /pembelianBahanMakanan/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /distribusiSppg/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /activityLog/{id} {
          allow read: if true;
          allow write: if request.auth != null;
        }
@@ -152,6 +192,38 @@ melihat data yang sama secara real-time.
   Gudang"** untuk mencatat hari berikutnya.
 - **Distribusi**: setiap pengiriman galon (ke lokasi lama maupun baru) dicatat
   di sini, jadi ke mana pun barang dikirim akan tetap terdata.
+- **Koperasi Bahan Makanan**: modul terpisah dari Web RSI (sidebar & halaman
+  sendiri), dengan collection Firestore sendiri (`pembelianBahanMakanan` dan
+  `distribusiSppg`) — strukturnya beda:
+  - **Pembelian**: satu barang yang dibeli = satu dokumen tersendiri, dengan
+    tanggal & jam otomatis dari Firestore server timestamp.
+  - **Distribusi ke SPPG**: satu **nota pengiriman** = satu dokumen, berisi
+    array `items` yang bisa memuat banyak barang sekaligus. Tanggal & jam
+    kirim diisi manual (sesuai kapan barang benar-benar dikirim), sedangkan
+    waktu pencatatan ke sistem tetap otomatis (server timestamp) — keduanya
+    disimpan terpisah.
+- **Riwayat Aktivitas**: transparansi tim — setiap tambah/ubah/hapus data di
+  kedua modul tercatat di collection `activityLog` (siapa, kapan, ringkasan
+  perubahan), termasuk jejak data yang sudah dihapus. Bisa diakses dari
+  sidebar modul mana pun. Halaman ini punya filter (modul, jenis aksi,
+  pencarian email, rentang tanggal) supaya tetap gampang ditelusuri walau
+  datanya makin banyak.
+- **Edit data**: baris di Pengiriman RSI, Pembelian, dan Distribusi SPPG bisa
+  diklik ikon ✏️ untuk mengisi ulang form dengan data yang sudah ada (untuk
+  nota SPPG, semua baris barangnya ikut dimuat ulang) — tinggal ubah lalu
+  klik tombol "Update...". Perubahan tercatat di Riwayat Aktivitas (aksi
+  "Ubah"), dan waktu/pembuat data asli (`createdAt`/`createdBy`) tetap
+  dipertahankan — hanya `updatedAt`/`updatedBy` yang ditambahkan.
+- **Daftar Harga Katalog**: tombol "Download Daftar Harga (PDF)" di halaman
+  Katalog Produk, untuk dibagikan ke pelanggan/agen.
+- **Download Laporan**: setiap halaman Koperasi (Pembelian, Distribusi SPPG,
+  Stok Gudang RSI) punya filter rentang tanggal + tombol download **CSV**
+  (langsung bisa dibuka di Excel/Google Sheets). Halaman **Laporan Keuangan
+  Koperasi** juga punya tombol **Download PDF** — ini memakai fitur
+  "Print → Save as PDF" bawaan browser (diarahkan otomatis ke tampilan
+  laporan yang sudah dirapikan khusus cetak), bukan library PDF pihak
+  ketiga. Semua ini **tanpa library/dependency tambahan** — konsisten dengan
+  prinsip situs ini sejak awal (murni HTML/CSS/JS, tanpa build).
 - Situs ini murni front-end, jadi biaya hosting **Rp0** (GitHub Pages gratis)
   dan Firebase juga gratis untuk pemakaian skala kecil seperti ini (jauh di
   bawah kuota gratis/hari).
@@ -161,6 +233,8 @@ melihat data yang sama secara real-time.
 - Kontrol akses berbasis peran (mis. admin vs staf lapangan).
 - Grafik tren stok harian.
 - Rekap total pengiriman per lokasi (akumulasi bulanan).
-- Ekspor data ke Excel.
+- File .xlsx asli (bukan CSV) atau PDF sekali-klik tanpa dialog print — bisa
+  dibuat, tapi perlu menambah library eksternal (SheetJS/jsPDF) via CDN,
+  yang berarti situs jadi bergantung pada layanan pihak ketiga saat runtime.
 
 Beri tahu saya kalau salah satu dari ini mau dibuatkan.

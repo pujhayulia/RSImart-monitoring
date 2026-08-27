@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rumah Sehat Indonesia — Katalog, Stok & Keuangan</title>
-<meta name="description" content="Katalog produk, stok Gudang RSI, pencatatan distribusi pengiriman, dan rekap keuangan otomatis untuk Yayasan Rumah Sehat Indonesia (ARSI).">
+<title>Yayasan Rumah Sehat Indonesia — Katalog, Stok, Distribusi & Koperasi</title>
+<meta name="description" content="Katalog produk ARSI, stok Gudang RSI, distribusi pengiriman, koperasi bahan makanan (pembelian & distribusi ke SPPG), dan rekap keuangan otomatis untuk Yayasan Rumah Sehat Indonesia.">
 <meta name="format-detection" content="telephone=no">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHRleHQgeT0iMjAiIGZvbnQtc2l6ZT0iMjAiPvCfkqc8L3RleHQ+PC9zdmc+">
 <link rel="stylesheet" href="style.css">
@@ -13,267 +13,798 @@
 
 <!-- AUTH OVERLAY -->
 <div class="auth-overlay" id="authOverlay">
-  <div class="auth-card">
-    <div class="brand-row brand-row--auth">
-      <div class="brand-chip chip-green">RSI</div>
-      <div class="brand-chip chip-teal">💧</div>
-      <span class="sep sep--muted">Rumah Sehat Indonesia</span>
-    </div>
-    <h2 id="authTitle">Masuk ke akun Anda</h2>
-    <p id="authSubtitle">Masuk untuk melihat dan mengisi data stok, distribusi, dan keuangan.</p>
-
-    <form id="authForm">
-      <div class="auth-field">
-        <label for="authEmail">Email</label>
-        <input type="email" id="authEmail" required autocomplete="email">
+  <div class="auth-shell">
+    <div class="auth-brand-panel">
+      <div class="brand-row">
+        <div class="brand-chip chip-green">RSI</div>
+        <div class="brand-chip chip-teal">💧</div>
       </div>
-      <div class="auth-field">
-        <label for="authPassword">Kata Sandi</label>
-        <input type="password" id="authPassword" required minlength="6" autocomplete="current-password">
-      </div>
-      <div class="auth-field hidden" id="authConfirmWrap">
-        <label for="authPasswordConfirm">Ulangi Kata Sandi</label>
-        <input type="password" id="authPasswordConfirm" minlength="6" autocomplete="new-password">
-      </div>
-      <div class="auth-error hidden" id="authError"></div>
-      <button type="submit" class="btn btn--block" id="authSubmitBtn">Masuk</button>
-    </form>
+      <h1 class="auth-brand-title">Yayasan Rumah Sehat Indonesia</h1>
+      <p class="auth-brand-tagline">Satu tempat untuk katalog produk, stok Gudang RSI, distribusi pengiriman, koperasi bahan makanan, dan rekap keuangan — tersinkron real-time untuk seluruh tim.</p>
+      <ul class="auth-brand-points">
+        <li>Data tersinkron real-time ke semua perangkat</li>
+        <li>Rekap keuangan otomatis dari tiap pengiriman</li>
+        <li>Pembelian &amp; distribusi koperasi tercatat rapi per item</li>
+      </ul>
+    </div>
+    <div class="auth-form-panel">
+      <div class="auth-card">
+        <h2 id="authTitle">Masuk ke akun Anda</h2>
+        <p id="authSubtitle">Masuk untuk melihat dan mengisi data stok, distribusi, dan keuangan.</p>
 
-    <div class="auth-switch">
-      <span id="authSwitchText">Belum punya akun?</span>
-      <a href="#" id="authSwitchLink">Daftar di sini</a>
-    </div>
-    <a href="#" id="authForgotLink" class="auth-forgot">Lupa kata sandi?</a>
-  </div>
-</div>
-
-<div id="mainApp" class="hidden">
-<header>
-  <div class="header-inner">
-    <div class="brand-row">
-      <div class="brand-chip chip-green">RSI</div>
-      <div class="brand-chip chip-teal">💧</div>
-      <span class="sep">Yayasan Rumah Sehat Indonesia</span>
-    </div>
-    <h1>Katalog, Stok Gudang & Keuangan ARSI</h1>
-    <p>Katalog produk, stok Gudang RSI, pencatatan pengiriman ke berbagai lokasi, dan rekap keuangan otomatis dari tiap pengiriman.</p>
-    <div class="status-pill">
-      <span class="status-dot off" id="statusDot"></span>
-      <span id="statusText">Menyambungkan...</span>
-    </div>
-    <div class="tabs">
-      <span class="tab-link tab-link--muted" id="userEmailPill"></span>
-      <a href="#" class="tab-link tab-link--muted" id="btnLogout">Keluar</a>
-    </div>
-    <div class="tabs">
-      <a class="tab-link" href="#katalog">Katalog Produk</a>
-      <a class="tab-link" href="#gudang">Stok Gudang RSI</a>
-      <a class="tab-link" href="#distribusi">Distribusi</a>
-      <a class="tab-link" href="#keuangan">Keuangan</a>
-    </div>
-  </div>
-</header>
-
-<div class="wrap">
-
-  <!-- KATALOG -->
-  <section id="katalog">
-    <div class="section-head">
-      <div class="eyebrow">Produk</div>
-      <h2>Katalog Produk Rumah Sehat Indonesia</h2>
-      <p>Air ARSI dan produk kebersihan rumah tangga.</p>
-    </div>
-    <div class="prod-grid" id="prodGrid"></div>
-    <div class="catalog-note">
-      <div><b>Jerigen sabun 5L:</b> ada biaya tambahan Rp15.000 per pembelian.</div>
-      <div><b>Refill jerigen:</b> jika jerigen lama dikembalikan, harga sesuai tabel di atas.</div>
-    </div>
-  </section>
-
-  <!-- STOK GUDANG RSI -->
-  <section id="gudang">
-    <div class="section-head">
-      <div class="eyebrow">Sumber Stok Tunggal</div>
-      <h2>Stok Gudang RSI</h2>
-      <p>Semua lokasi di bagian Distribusi adalah tujuan pengiriman biasa — stok fisik hanya tercatat di sini, di Gudang RSI.</p>
-    </div>
-
-    <div class="rekap-top">
-      <div>
-        <label class="inline-label" for="rekapDateSelect">Tanggal:</label>
-        <select id="rekapDateSelect"></select>
-      </div>
-      <button class="btn" id="btnToggleForm">+ Update Stok Gudang</button>
-    </div>
-
-    <div id="gudangBox" class="gudang-box"></div>
-
-    <div class="totals-row">
-      <div class="total-card">
-        <div class="lbl">Stok Isi (Galon)</div>
-        <div class="val" id="totalIsi">–</div>
-      </div>
-      <div class="total-card amber">
-        <div class="lbl">Stok Kosong (Galon)</div>
-        <div class="val" id="totalKosong">–</div>
-      </div>
-      <div class="total-card alt">
-        <div class="lbl">Jumlah Peredaran Galon</div>
-        <div class="val" id="totalPeredaran">–</div>
-      </div>
-    </div>
-
-    <div class="section-head section-head--sub">
-      <h3>Stok Produk Lain</h3>
-      <p>Botol, sabun, dan pembersih lantai — dihitung terpisah dari galon.</p>
-    </div>
-    <div class="stok-mini-grid" id="stokProdukGrid"></div>
-
-    <div class="form-panel" id="formPanel">
-      <b class="form-panel-title">Update Stok Gudang RSI</b>
-      <div class="form-grid">
-        <div class="form-field"><label for="newRekapDate">Tanggal</label><input type="date" id="newRekapDate"></div>
-        <div class="form-field"><label for="gudangIsi">Stok Isi Galon</label><input type="number" id="gudangIsi" placeholder="-"></div>
-        <div class="form-field"><label for="gudangKosong">Stok Kosong Galon</label><input type="number" id="gudangKosong" placeholder="-"></div>
-        <div class="form-field"><label for="gudangPeredaran">Peredaran Galon</label><input type="number" id="gudangPeredaran" placeholder="-"></div>
-      </div>
-      <div class="hint hint--first">Stok produk lain (satuan sesuai produk):</div>
-      <div class="form-grid" id="stokProdukFormGrid"></div>
-      <div class="form-actions">
-        <button class="btn" id="btnSaveRekap">Simpan Stok Gudang</button>
-        <button class="btn-ghost" id="btnCancelRekap">Batal</button>
-      </div>
-      <div class="hint">Menyimpan tanggal yang sudah ada akan menimpa data lama untuk tanggal itu.</div>
-    </div>
-  </section>
-
-  <!-- DISTRIBUSI -->
-  <section id="distribusi">
-    <div class="section-head">
-      <div class="eyebrow">Pengiriman</div>
-      <h2>Distribusi & Pengiriman</h2>
-      <p>Catat pengiriman ke lokasi mana pun. Lokasi baru otomatis tersimpan dan langsung muncul jadi pilihan berikutnya untuk semua orang.</p>
-    </div>
-    <div class="dist-grid">
-      <div class="dist-form">
-        <h3>Catat Pengiriman Baru</h3>
-        <p class="tip">Pilih lokasi yang sudah ada, atau ketik tujuan baru — otomatis tersimpan.</p>
-        <div class="dist-field">
-          <label for="distTanggalPesan">Tanggal Pesan</label>
-          <input type="date" id="distTanggalPesan">
-        </div>
-        <div class="dist-field">
-          <label for="distTanggalKirim">Tanggal Kirim</label>
-          <input type="date" id="distTanggalKirim">
-        </div>
-        <div class="dist-field">
-          <label for="distTujuan">Tujuan Pengiriman</label>
-          <input list="lokasiList" id="distTujuan" placeholder="Contoh: Dapur Nambo / lokasi baru...">
-          <datalist id="lokasiList"></datalist>
-        </div>
-        <div class="dist-field">
-          <label for="distProduk">Produk</label>
-          <select id="distProduk"></select>
-        </div>
-        <div class="dist-field hidden" id="distTipeHargaWrap">
-          <label for="distTipeHarga">Tipe Harga</label>
-          <select id="distTipeHarga"></select>
-        </div>
-        <div class="dist-field">
-          <label for="distJumlah">Jumlah Terkirim</label>
-          <div class="dist-jumlah-row">
-            <input type="number" id="distJumlah" placeholder="0">
-            <span id="distSatuan" class="dist-satuan">galon</span>
+        <form id="authForm">
+          <div class="auth-field">
+            <label for="authEmail">Email</label>
+            <input type="email" id="authEmail" required autocomplete="email">
           </div>
-        </div>
-        <div class="dist-field">
-          <label for="distDibayar">Status Pembayaran</label>
-          <select id="distDibayar">
-            <option value="belum">Belum Dibayar</option>
-            <option value="sudah">Sudah Dibayar</option>
-          </select>
-        </div>
-        <div class="dist-field hidden" id="distMetodeWrap">
-          <label for="distMetodeBayar">Metode Pembayaran</label>
-          <select id="distMetodeBayar">
-            <option value="Tunai">Tunai</option>
-            <option value="Transfer">Transfer</option>
-            <option value="QRIS">QRIS</option>
-          </select>
-        </div>
-        <div class="dist-field">
-          <label for="distKeterangan">Keterangan (opsional)</label>
-          <textarea id="distKeterangan" rows="2" placeholder="Mis. nama pengantar, catatan tambahan"></textarea>
-        </div>
-        <div class="estimasi-box">
-          <div class="estimasi-row"><span>Harga satuan</span><b id="distHargaSatuan">–</b></div>
-          <div class="estimasi-row total"><span>Estimasi total</span><b id="distEstimasi">—</b></div>
-        </div>
-        <button class="btn btn--block" id="btnSaveDist">Simpan Pengiriman</button>
-        <div class="shared-note">Data ini tersimpan bersama secara real-time, dan otomatis masuk ke Rekap Keuangan.</div>
-      </div>
-      <div>
-        <div class="dist-filter-row">
-          <select id="distFilterProduk" aria-label="Filter produk pada log pengiriman"></select>
-        </div>
-        <div class="dist-log" id="distLog"></div>
-      </div>
-    </div>
-  </section>
+          <div class="auth-field">
+            <label for="authPassword">Kata Sandi</label>
+            <input type="password" id="authPassword" required minlength="6" autocomplete="current-password">
+          </div>
+          <div class="auth-field hidden" id="authConfirmWrap">
+            <label for="authPasswordConfirm">Ulangi Kata Sandi</label>
+            <input type="password" id="authPasswordConfirm" minlength="6" autocomplete="new-password">
+          </div>
+          <div class="auth-error hidden" id="authError"></div>
+          <button type="submit" class="btn btn--block" id="authSubmitBtn">Masuk</button>
+        </form>
 
-  <!-- KEUANGAN -->
-  <section id="keuangan">
-    <div class="section-head">
-      <div class="eyebrow">Otomatis dari Pengiriman</div>
-      <h2>Rekap Keuangan</h2>
-      <p>Dihitung otomatis dari jumlah × harga setiap pengiriman yang dicatat — tidak perlu input manual.</p>
-    </div>
-    <div class="totals-row">
-      <div class="total-card">
-        <div class="lbl">Pemasukan Bulan Ini (Lunas)</div>
-        <div class="val" id="finBulanIni">–</div>
-      </div>
-      <div class="total-card alt">
-        <div class="lbl">Pemasukan Semua Waktu (Lunas)</div>
-        <div class="val" id="finSemua">–</div>
-      </div>
-      <div class="total-card amber">
-        <div class="lbl">Piutang Belum Dibayar</div>
-        <div class="val" id="finPiutang">–</div>
+        <div class="auth-switch">
+          <span id="authSwitchText">Belum punya akun?</span>
+          <a href="#" id="authSwitchLink">Daftar di sini</a>
+        </div>
+        <a href="#" id="authForgotLink" class="auth-forgot">Lupa kata sandi?</a>
       </div>
     </div>
-    <div class="fin-panel">
-      <div class="fin-head">
-        <div>Produk</div>
-        <div>Jumlah Terjual</div>
-        <div>Total</div>
-      </div>
-      <div id="finTable"></div>
-    </div>
-
-    <div class="section-head section-head--sub">
-      <h3>Ringkasan per Metode Pembayaran</h3>
-      <p>Dari transaksi yang sudah lunas.</p>
-    </div>
-    <div class="fin-panel">
-      <div class="fin-head fin-head--2col">
-        <div>Metode</div>
-        <div>Total</div>
-      </div>
-      <div id="finMetodeTable"></div>
-    </div>
-
-    <div class="section-head section-head--sub">
-      <h3>Daftar Piutang</h3>
-      <p>Pesanan yang sudah dikirim tapi belum dibayar.</p>
-    </div>
-    <div class="dist-log" id="piutangList"></div>
-  </section>
-
-  <footer>Rumah Sehat Indonesia · ARSI · Dibuat sebagai alat bantu monitoring internal</footer>
+  </div>
 </div>
+
+<!-- APP -->
+<div id="mainApp" class="hidden">
+
+  <!-- PILIH MODUL / DASHBOARD AWAL -->
+  <div id="moduleSelect" class="module-select">
+    <div class="module-select-inner">
+
+      <!-- HERO -->
+      <div class="landing-hero">
+        <div class="brand-row">
+          <div class="brand-chip chip-green">RSI</div>
+          <div class="brand-chip chip-teal">💧</div>
+        </div>
+        <h1 class="landing-hero-title">Rumah Sehat Indonesia</h1>
+        <p class="landing-hero-tagline">Satu tempat untuk memantau stok, distribusi, dan keuangan operasional yayasan — tersinkron real-time untuk seluruh tim.</p>
+      </div>
+
+      <!-- QUICK STATS LINTAS MODUL -->
+      <div class="totals-row landing-stats">
+        <div class="total-card">
+          <div class="lbl">Stok Galon Terkini</div>
+          <div class="val" id="landingStokGalon">–</div>
+        </div>
+        <div class="total-card amber">
+          <div class="lbl">Pembelian Koperasi Bulan Ini</div>
+          <div class="val" id="landingPembelianBulanIni">–</div>
+        </div>
+        <div class="total-card alt">
+          <div class="lbl">Distribusi ke SPPG Bulan Ini</div>
+          <div class="val" id="landingDistribusiBulanIni">–</div>
+        </div>
+      </div>
+
+      <!-- PILIH MODUL -->
+      <div class="section-head section-head--sub landing-section-head">
+        <h3>Pilih Modul</h3>
+        <p>Dua modul terpisah — datanya masing-masing, dan bisa diganti kapan saja lewat "Ganti Modul" di sidebar.</p>
+      </div>
+      <div class="module-select-grid">
+        <button type="button" class="module-card js-module-pick" data-module="rsi">
+          <span class="module-card-icon">💧</span>
+          <span class="module-card-title">Web RSI</span>
+          <span class="module-card-desc">Katalog produk, stok Gudang RSI, distribusi pengiriman, dan rekap keuangan.</span>
+        </button>
+        <button type="button" class="module-card js-module-pick" data-module="koperasi">
+          <span class="module-card-icon">🥬</span>
+          <span class="module-card-title">Koperasi Bahan Makanan</span>
+          <span class="module-card-desc">Pembelian bahan makanan dari toko/supplier, dan distribusi ke SPPG.</span>
+        </button>
+      </div>
+
+      <!-- AKSES CEPAT -->
+      <div class="section-head section-head--sub landing-section-head">
+        <h3>Akses Cepat</h3>
+        <p>Langsung ke halaman yang sering dipakai.</p>
+      </div>
+      <div class="landing-quicknav-grid">
+        <button type="button" class="landing-quicknav-card js-quicknav" data-module="rsi" data-page="gudang">
+          <span class="landing-quicknav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9 21v-6h6v6"/></svg>
+          </span>
+          <span class="landing-quicknav-label">Stok Gudang RSI</span>
+        </button>
+        <button type="button" class="landing-quicknav-card js-quicknav" data-module="koperasi" data-page="pembelian">
+          <span class="landing-quicknav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M2.5 3h2.2l2.2 12a1.8 1.8 0 0 0 1.8 1.5h8.2a1.8 1.8 0 0 0 1.8-1.4L20.5 7H5.8"/></svg>
+          </span>
+          <span class="landing-quicknav-label">Koperasi — Pembelian</span>
+        </button>
+        <button type="button" class="landing-quicknav-card js-quicknav" data-module="koperasi" data-page="distribusisppg">
+          <span class="landing-quicknav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="7" width="12.5" height="10" rx="1"/><path d="M14 10.5h3.5L21 14v3h-3"/><circle cx="6" cy="19" r="1.6"/><circle cx="16.5" cy="19" r="1.6"/></svg>
+          </span>
+          <span class="landing-quicknav-label">Koperasi — Distribusi SPPG</span>
+        </button>
+        <button type="button" class="landing-quicknav-card js-quicknav" data-module="koperasi" data-page="laporankeuangan">
+          <span class="landing-quicknav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="2.5" width="15" height="19" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+          </span>
+          <span class="landing-quicknav-label">Laporan Keuangan Koperasi</span>
+        </button>
+      </div>
+
+      <div class="module-select-footer">
+        <div class="status-pill">
+          <span class="status-dot off js-status-dot"></span>
+          <span class="js-status-text">Menyambungkan...</span>
+        </div>
+        <span class="module-select-user js-user-email-pill"></span>
+        <a href="#" class="js-btn-logout module-select-logout">Keluar</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHELL MODUL (sidebar + halaman) -->
+  <div class="app-shell hidden" id="appShell">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-chip chip-green">RSI</div>
+        <div class="brand-chip chip-teal">💧</div>
+        <span class="sidebar-brand-text js-module-label">Web RSI</span>
+      </div>
+
+      <nav class="sidebar-nav" data-module="rsi" aria-label="Navigasi Web RSI">
+        <a href="#/rsi/beranda" class="sidebar-link" data-module="rsi" data-page="beranda"><span class="sidebar-link-icon">🏠</span>Beranda</a>
+        <a href="#/rsi/katalog" class="sidebar-link" data-module="rsi" data-page="katalog"><span class="sidebar-link-icon">📦</span>Katalog Produk</a>
+        <a href="#/rsi/gudang" class="sidebar-link" data-module="rsi" data-page="gudang"><span class="sidebar-link-icon">🏬</span>Stok Gudang RSI</a>
+        <a href="#/rsi/distribusi" class="sidebar-link" data-module="rsi" data-page="distribusi"><span class="sidebar-link-icon">🚚</span>Distribusi</a>
+        <a href="#/rsi/keuangan" class="sidebar-link" data-module="rsi" data-page="keuangan"><span class="sidebar-link-icon">💰</span>Keuangan</a>
+      </nav>
+
+      <nav class="sidebar-nav hidden" data-module="koperasi" aria-label="Navigasi Koperasi Bahan Makanan">
+        <a href="#/koperasi/beranda" class="sidebar-link" data-module="koperasi" data-page="beranda"><span class="sidebar-link-icon">🏠</span>Beranda</a>
+        <a href="#/koperasi/pembelian" class="sidebar-link" data-module="koperasi" data-page="pembelian"><span class="sidebar-link-icon">🛒</span>Pembelian Bahan Makanan</a>
+        <a href="#/koperasi/distribusisppg" class="sidebar-link" data-module="koperasi" data-page="distribusisppg"><span class="sidebar-link-icon">🥬</span>Distribusi ke SPPG</a>
+        <a href="#/koperasi/laporankeuangan" class="sidebar-link" data-module="koperasi" data-page="laporankeuangan"><span class="sidebar-link-icon">📊</span>Laporan Keuangan Koperasi</a>
+      </nav>
+
+      <nav class="sidebar-nav-shared" aria-label="Navigasi bersama">
+        <a href="#/aktivitas" class="sidebar-link" data-module="shared" data-page="aktivitas"><span class="sidebar-link-icon">📜</span>Riwayat Aktivitas</a>
+        <a href="#" class="sidebar-link js-ganti-modul"><span class="sidebar-link-icon">🔀</span>Ganti Modul</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-pill">
+          <span class="status-dot off js-status-dot"></span>
+          <span class="js-status-text">Menyambungkan...</span>
+        </div>
+        <div class="sidebar-user js-user-email-pill"></div>
+        <a href="#" class="js-btn-logout sidebar-logout">Keluar</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <button type="button" class="hamburger" id="btnMenuToggle" aria-label="Buka menu navigasi">
+          <span></span><span></span><span></span>
+        </button>
+        <h1 class="topbar-title" id="topbarTitle">Beranda</h1>
+      </header>
+
+      <main class="page-content">
+
+        <!-- ===== WEB RSI ===== -->
+
+        <!-- BERANDA RSI -->
+        <section class="page" data-module="rsi" data-page="beranda" id="page-rsi-beranda">
+          <div class="section-head">
+            <div class="eyebrow">Ringkasan</div>
+            <h2>Selamat datang kembali</h2>
+            <p>Ringkasan cepat stok dan keuangan Rumah Sehat Indonesia hari ini.</p>
+          </div>
+
+          <div class="totals-row">
+            <div class="total-card">
+              <div class="lbl">Stok Isi Galon</div>
+              <div class="val" id="berandaStokIsi">–</div>
+            </div>
+            <div class="total-card amber">
+              <div class="lbl">Stok Kosong Galon</div>
+              <div class="val" id="berandaStokKosong">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Pemasukan Bulan Ini</div>
+              <div class="val" id="berandaBulanIni">–</div>
+            </div>
+            <div class="total-card danger">
+              <div class="lbl">Piutang Belum Dibayar</div>
+              <div class="val" id="berandaPiutang">–</div>
+            </div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Menu Cepat</h3>
+            <p>Langsung ke fitur yang Anda butuhkan.</p>
+          </div>
+          <div class="quick-link-grid">
+            <a class="quick-link-card" href="#/rsi/katalog">
+              <span class="quick-link-icon">📦</span>
+              <span class="quick-link-title">Katalog Produk</span>
+              <span class="quick-link-desc">Lihat daftar produk &amp; harga terbaru.</span>
+            </a>
+            <a class="quick-link-card" href="#/rsi/gudang">
+              <span class="quick-link-icon">🏬</span>
+              <span class="quick-link-title">Stok Gudang RSI</span>
+              <span class="quick-link-desc">Cek &amp; perbarui stok galon dan produk lain.</span>
+            </a>
+            <a class="quick-link-card" href="#/rsi/distribusi">
+              <span class="quick-link-icon">🚚</span>
+              <span class="quick-link-title">Distribusi</span>
+              <span class="quick-link-desc">Catat pengiriman baru ke tiap lokasi.</span>
+            </a>
+            <a class="quick-link-card" href="#/rsi/keuangan">
+              <span class="quick-link-icon">💰</span>
+              <span class="quick-link-title">Keuangan</span>
+              <span class="quick-link-desc">Rekap pemasukan &amp; daftar piutang.</span>
+            </a>
+          </div>
+        </section>
+
+        <!-- KATALOG -->
+        <section class="page" data-module="rsi" data-page="katalog" id="page-rsi-katalog">
+          <div class="section-head">
+            <div class="eyebrow">Produk</div>
+            <h2>Katalog Produk Rumah Sehat Indonesia</h2>
+            <p>Air ARSI dan produk kebersihan rumah tangga.</p>
+          </div>
+          <div class="prod-grid" id="prodGrid"></div>
+          <div class="catalog-note">
+            <div><b>Jerigen sabun 5L:</b> ada biaya tambahan Rp15.000 per pembelian.</div>
+            <div><b>Refill jerigen:</b> jika jerigen lama dikembalikan, harga sesuai tabel di atas.</div>
+          </div>
+          <div class="laporan-download-row">
+            <button type="button" class="btn-ghost" id="btnDownloadKatalog">⬇ Download Daftar Harga (PDF)</button>
+          </div>
+        </section>
+
+        <!-- STOK GUDANG RSI -->
+        <section class="page" data-module="rsi" data-page="gudang" id="page-rsi-gudang">
+          <div class="section-head">
+            <div class="eyebrow">Sumber Stok Tunggal</div>
+            <h2>Stok Gudang RSI</h2>
+            <p>Semua lokasi di bagian Distribusi adalah tujuan pengiriman biasa — stok fisik hanya tercatat di sini, di Gudang RSI.</p>
+          </div>
+
+          <div class="rekap-top">
+            <div>
+              <label class="inline-label" for="rekapDateSelect">Tanggal:</label>
+              <select id="rekapDateSelect"></select>
+            </div>
+            <button type="button" class="btn" id="btnToggleForm">+ Update Stok Gudang</button>
+          </div>
+
+          <div id="gudangBox" class="gudang-box"></div>
+
+          <div class="totals-row">
+            <div class="total-card">
+              <div class="lbl">Stok Isi (Galon)</div>
+              <div class="val" id="totalIsi">–</div>
+            </div>
+            <div class="total-card amber">
+              <div class="lbl">Stok Kosong (Galon)</div>
+              <div class="val" id="totalKosong">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Jumlah Peredaran Galon</div>
+              <div class="val" id="totalPeredaran">–</div>
+            </div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Laporan Riwayat Stok</h3>
+            <p>Unduh seluruh riwayat update stok gudang dalam rentang tanggal tertentu.</p>
+          </div>
+          <div class="date-filter-row">
+            <input type="date" id="gudangFilterDari" aria-label="Dari tanggal">
+            <span class="date-filter-sep">–</span>
+            <input type="date" id="gudangFilterSampai" aria-label="Sampai tanggal">
+            <button type="button" class="btn-ghost" id="btnDownloadGudang">⬇ Download Laporan (CSV)</button>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Stok Produk Lain</h3>
+            <p>Botol, sabun, dan pembersih lantai — dihitung terpisah dari galon.</p>
+          </div>
+          <div class="stok-mini-grid" id="stokProdukGrid"></div>
+
+          <div class="form-panel" id="formPanel">
+            <b class="form-panel-title">Update Stok Gudang RSI</b>
+            <div class="form-grid">
+              <div class="form-field"><label for="newRekapDate">Tanggal</label><input type="date" id="newRekapDate"></div>
+              <div class="form-field"><label for="gudangIsi">Stok Isi Galon</label><input type="number" id="gudangIsi" placeholder="-"></div>
+              <div class="form-field"><label for="gudangKosong">Stok Kosong Galon</label><input type="number" id="gudangKosong" placeholder="-"></div>
+              <div class="form-field"><label for="gudangPeredaran">Peredaran Galon</label><input type="number" id="gudangPeredaran" placeholder="-"></div>
+            </div>
+            <div class="hint hint--first">Stok produk lain (satuan sesuai produk):</div>
+            <div class="form-grid" id="stokProdukFormGrid"></div>
+            <div class="form-actions">
+              <button type="button" class="btn" id="btnSaveRekap">Simpan Stok Gudang</button>
+              <button type="button" class="btn-ghost" id="btnCancelRekap">Batal</button>
+            </div>
+            <div class="hint">Menyimpan tanggal yang sudah ada akan menimpa data lama untuk tanggal itu.</div>
+          </div>
+        </section>
+
+        <!-- DISTRIBUSI -->
+        <section class="page" data-module="rsi" data-page="distribusi" id="page-rsi-distribusi">
+          <div class="section-head">
+            <div class="eyebrow">Pengiriman</div>
+            <h2>Distribusi &amp; Pengiriman</h2>
+            <p>Catat pengiriman ke lokasi mana pun. Lokasi baru otomatis tersimpan dan langsung muncul jadi pilihan berikutnya untuk semua orang.</p>
+          </div>
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Catat Pengiriman Baru</h3>
+              <p class="tip">Pilih lokasi yang sudah ada, atau ketik tujuan baru — otomatis tersimpan.</p>
+              <div class="dist-field">
+                <label for="distTanggalPesan">Tanggal Pesan</label>
+                <input type="date" id="distTanggalPesan">
+              </div>
+              <div class="dist-field">
+                <label for="distTanggalKirim">Tanggal Kirim</label>
+                <input type="date" id="distTanggalKirim">
+              </div>
+              <div class="dist-field">
+                <label for="distTujuan">Tujuan Pengiriman</label>
+                <input list="lokasiList" id="distTujuan" placeholder="Contoh: Dapur Nambo / lokasi baru...">
+                <datalist id="lokasiList"></datalist>
+              </div>
+              <div class="dist-field">
+                <label for="distProduk">Produk</label>
+                <select id="distProduk"></select>
+              </div>
+              <div class="dist-field hidden" id="distTipeHargaWrap">
+                <label for="distTipeHarga">Tipe Harga</label>
+                <select id="distTipeHarga"></select>
+              </div>
+              <div class="dist-field">
+                <label for="distJumlah">Jumlah Terkirim</label>
+                <div class="dist-jumlah-row">
+                  <input type="number" id="distJumlah" placeholder="0">
+                  <span id="distSatuan" class="dist-satuan">galon</span>
+                </div>
+              </div>
+              <div class="dist-field">
+                <label for="distDibayar">Status Pembayaran</label>
+                <select id="distDibayar">
+                  <option value="belum">Belum Dibayar</option>
+                  <option value="sudah">Sudah Dibayar</option>
+                </select>
+              </div>
+              <div class="dist-field hidden" id="distMetodeWrap">
+                <label for="distMetodeBayar">Metode Pembayaran</label>
+                <select id="distMetodeBayar">
+                  <option value="Tunai">Tunai</option>
+                  <option value="Transfer">Transfer</option>
+                  <option value="QRIS">QRIS</option>
+                </select>
+              </div>
+              <div class="dist-field">
+                <label for="distKeterangan">Keterangan (opsional)</label>
+                <textarea id="distKeterangan" rows="2" placeholder="Mis. nama pengantar, catatan tambahan"></textarea>
+              </div>
+              <div class="estimasi-box">
+                <div class="estimasi-row"><span>Harga satuan</span><b id="distHargaSatuan">–</b></div>
+                <div class="estimasi-row total"><span>Estimasi total</span><b id="distEstimasi">—</b></div>
+              </div>
+              <button type="button" class="btn btn--block" id="btnSaveDist">Simpan Pengiriman</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditDist">Batal Edit</button>
+              <div class="shared-note">Data ini tersimpan bersama secara real-time, dan otomatis masuk ke Rekap Keuangan.</div>
+            </div>
+            <div>
+              <div class="dist-filter-row">
+                <select id="distFilterProduk" aria-label="Filter produk pada log pengiriman"></select>
+              </div>
+              <div class="dist-log" id="distLog"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- KEUANGAN -->
+        <section class="page" data-module="rsi" data-page="keuangan" id="page-rsi-keuangan">
+          <div class="section-head">
+            <div class="eyebrow">Otomatis dari Pengiriman</div>
+            <h2>Rekap Keuangan</h2>
+            <p>Dihitung otomatis dari jumlah × harga setiap pengiriman yang dicatat — tidak perlu input manual.</p>
+          </div>
+          <div class="totals-row">
+            <div class="total-card">
+              <div class="lbl">Pemasukan Bulan Ini (Lunas)</div>
+              <div class="val" id="finBulanIni">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Pemasukan Semua Waktu (Lunas)</div>
+              <div class="val" id="finSemua">–</div>
+            </div>
+            <div class="total-card amber">
+              <div class="lbl">Piutang Belum Dibayar</div>
+              <div class="val" id="finPiutang">–</div>
+            </div>
+          </div>
+          <div class="fin-panel">
+            <div class="fin-head">
+              <div>Produk</div>
+              <div>Jumlah Terjual</div>
+              <div>Total</div>
+            </div>
+            <div id="finTable"></div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Laporan Pengiriman & Keuangan</h3>
+            <p>Unduh seluruh riwayat pengiriman (lunas &amp; piutang) dalam rentang tanggal tertentu.</p>
+          </div>
+          <div class="date-filter-row">
+            <input type="date" id="keuanganFilterDari" aria-label="Dari tanggal">
+            <span class="date-filter-sep">–</span>
+            <input type="date" id="keuanganFilterSampai" aria-label="Sampai tanggal">
+            <button type="button" class="btn-ghost" id="btnDownloadKeuangan">⬇ Download Laporan (CSV)</button>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Ringkasan per Metode Pembayaran</h3>
+            <p>Dari transaksi yang sudah lunas.</p>
+          </div>
+          <div class="fin-panel">
+            <div class="fin-head fin-head--2col">
+              <div>Metode</div>
+              <div>Total</div>
+            </div>
+            <div id="finMetodeTable"></div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Daftar Piutang</h3>
+            <p>Pesanan yang sudah dikirim tapi belum dibayar.</p>
+          </div>
+          <div class="dist-log" id="piutangList"></div>
+        </section>
+
+        <!-- ===== KOPERASI BAHAN MAKANAN ===== -->
+
+        <!-- BERANDA KOPERASI -->
+        <section class="page" data-module="koperasi" data-page="beranda" id="page-koperasi-beranda">
+          <div class="section-head">
+            <div class="eyebrow">Koperasi Yayasan</div>
+            <h2>Koperasi Bahan Makanan</h2>
+            <p>Ringkasan pembelian bahan makanan dan distribusi ke SPPG — terpisah dari Web RSI, untuk laporan biaya ke kepala yayasan.</p>
+          </div>
+
+          <div class="totals-row">
+            <div class="total-card">
+              <div class="lbl">Total Pengeluaran Pembelian</div>
+              <div class="val" id="berandaKopTotalBelanja">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Jumlah Transaksi Pembelian</div>
+              <div class="val" id="berandaKopTransaksi">–</div>
+            </div>
+            <div class="total-card amber">
+              <div class="lbl">Total Nilai Distribusi ke SPPG</div>
+              <div class="val" id="berandaKopNilaiDistribusi">–</div>
+            </div>
+            <div class="total-card danger">
+              <div class="lbl">Jumlah Barang Didistribusikan</div>
+              <div class="val" id="berandaKopItemDistribusi">–</div>
+            </div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Ringkasan Keuangan Koperasi</h3>
+            <p>Total pengeluaran (Pembelian), pemasukan (Distribusi ke SPPG), dan saldo — bisa difilter per tanggal.</p>
+          </div>
+          <div class="date-filter-row">
+            <input type="date" id="kopKeuanganFilterDari" aria-label="Dari tanggal">
+            <span class="date-filter-sep">–</span>
+            <input type="date" id="kopKeuanganFilterSampai" aria-label="Sampai tanggal">
+            <button type="button" class="filter-reset" id="btnKopKeuanganFilterReset">Reset</button>
+          </div>
+          <div class="totals-row koperasi-totals koperasi-totals--3col" id="kopKeuanganCards">
+            <div class="total-card amber">
+              <div class="lbl">Total Pengeluaran</div>
+              <div class="val" id="kopKeuanganPengeluaran">–</div>
+            </div>
+            <div class="total-card">
+              <div class="lbl">Total Pemasukan</div>
+              <div class="val" id="kopKeuanganPemasukan">–</div>
+            </div>
+            <div class="total-card alt" id="kopKeuanganSaldoCard">
+              <div class="lbl">Saldo</div>
+              <div class="val" id="kopKeuanganSaldo">–</div>
+            </div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Menu Cepat</h3>
+            <p>Langsung ke fitur yang Anda butuhkan.</p>
+          </div>
+          <div class="quick-link-grid">
+            <a class="quick-link-card" href="#/koperasi/pembelian">
+              <span class="quick-link-icon">🛒</span>
+              <span class="quick-link-title">Pembelian Bahan Makanan</span>
+              <span class="quick-link-desc">Catat pembelian dari toko/supplier.</span>
+            </a>
+            <a class="quick-link-card" href="#/koperasi/distribusisppg">
+              <span class="quick-link-icon">🥬</span>
+              <span class="quick-link-title">Distribusi ke SPPG</span>
+              <span class="quick-link-desc">Catat barang yang didistribusikan ke SPPG.</span>
+            </a>
+            <a class="quick-link-card" href="#/koperasi/laporankeuangan">
+              <span class="quick-link-icon">📊</span>
+              <span class="quick-link-title">Laporan Keuangan Koperasi</span>
+              <span class="quick-link-desc">Rincian transaksi, breakdown, unduh PDF/CSV.</span>
+            </a>
+          </div>
+        </section>
+
+        <datalist id="satuanList">
+          <option value="kg"><option value="gram"><option value="liter"><option value="pcs">
+          <option value="ikat"><option value="papan"><option value="dus"><option value="karung">
+        </datalist>
+
+        <!-- PEMBELIAN BAHAN MAKANAN -->
+        <section class="page" data-module="koperasi" data-page="pembelian" id="page-koperasi-pembelian">
+          <div class="section-head">
+            <div class="eyebrow">Koperasi Yayasan</div>
+            <h2>Pembelian Bahan Makanan</h2>
+            <p>Setiap barang yang dibeli dicatat sebagai baris tersendiri, meski toko dan tanggalnya sama. Tanggal &amp; jam tersimpan otomatis.</p>
+          </div>
+
+          <div class="totals-row koperasi-totals">
+            <div class="total-card">
+              <div class="lbl">Total Pengeluaran (Difilter)</div>
+              <div class="val" id="pembelianTotalBelanja">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Jumlah Transaksi (Difilter)</div>
+              <div class="val" id="pembelianTotalTransaksi">–</div>
+            </div>
+          </div>
+
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Catat Pembelian Baru</h3>
+              <p class="tip">Tanggal &amp; jam tersimpan otomatis saat data disimpan.</p>
+              <div class="dist-field">
+                <label for="pembelianNamaToko">Nama Toko</label>
+                <input id="pembelianNamaToko" placeholder="Mis. Toko Sumber Rejeki">
+              </div>
+              <div class="dist-field">
+                <label for="pembelianNoHp">No. HP Toko</label>
+                <input id="pembelianNoHp" type="tel" placeholder="Mis. 0812xxxxxxx">
+              </div>
+              <div class="dist-field">
+                <label for="pembelianAlamatToko">Alamat Toko</label>
+                <input id="pembelianAlamatToko" placeholder="Alamat toko/supplier">
+              </div>
+              <div class="dist-field">
+                <label for="pembelianNamaPembeli">Nama Pembeli</label>
+                <input id="pembelianNamaPembeli" placeholder="Nama petugas/staf yang membeli">
+              </div>
+              <div class="dist-field">
+                <label for="pembelianNamaBarang">Nama Barang</label>
+                <input id="pembelianNamaBarang" placeholder="Mis. Ayam, Tahu, Minyak Goreng">
+              </div>
+              <div class="dist-field">
+                <label for="pembelianJumlah">Jumlah</label>
+                <div class="dist-jumlah-row">
+                  <input type="number" id="pembelianJumlah" placeholder="0">
+                  <input id="pembelianSatuan" list="satuanList" class="dist-satuan-input" placeholder="satuan">
+                </div>
+              </div>
+              <div class="dist-field">
+                <label for="pembelianHarga">Harga (Rp)</label>
+                <input type="number" id="pembelianHarga" placeholder="Total harga untuk barang ini">
+              </div>
+              <div class="dist-field">
+                <label for="pembelianCatatan">Catatan (opsional)</label>
+                <textarea id="pembelianCatatan" rows="2" placeholder="Catatan tambahan"></textarea>
+              </div>
+              <button type="button" class="btn btn--block" id="btnSavePembelian">Simpan Pembelian</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditPembelian">Batal Edit</button>
+              <div class="shared-note">Data ini tersimpan bersama secara real-time untuk laporan biaya ke kepala yayasan.</div>
+            </div>
+            <div>
+              <div class="date-filter-row">
+                <input type="date" id="pembelianFilterDari" aria-label="Dari tanggal">
+                <span class="date-filter-sep">–</span>
+                <input type="date" id="pembelianFilterSampai" aria-label="Sampai tanggal">
+                <button type="button" class="filter-reset" id="btnPembelianFilterReset">Reset</button>
+                <button type="button" class="btn-ghost download-btn" id="btnDownloadPembelian">⬇ Download (CSV)</button>
+              </div>
+              <div class="dist-log" id="pembelianLog"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DISTRIBUSI KE SPPG -->
+        <section class="page" data-module="koperasi" data-page="distribusisppg" id="page-koperasi-distribusisppg">
+          <div class="section-head">
+            <div class="eyebrow">Koperasi Yayasan</div>
+            <h2>Distribusi / Penjualan ke SPPG</h2>
+            <p>Satu nota pengiriman bisa berisi banyak barang sekaligus. Tanggal &amp; jam kirim diisi manual; waktu pencatatan tersimpan otomatis.</p>
+          </div>
+
+          <div class="totals-row koperasi-totals">
+            <div class="total-card amber">
+              <div class="lbl">Total Nilai Distribusi (Difilter)</div>
+              <div class="val" id="sppgTotalNilai">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Jumlah Barang (Difilter)</div>
+              <div class="val" id="sppgTotalItem">–</div>
+            </div>
+          </div>
+
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Catat Nota Pengiriman Baru</h3>
+              <p class="tip">Isi info nota, lalu tambahkan barangnya satu per satu.</p>
+              <div class="dist-field">
+                <label for="sppgTanggalKirim">Tanggal Kirim</label>
+                <input type="date" id="sppgTanggalKirim">
+              </div>
+              <div class="dist-field">
+                <label for="sppgJamKirim">Jam Kirim</label>
+                <input type="time" id="sppgJamKirim">
+              </div>
+              <div class="dist-field">
+                <label for="sppgTujuan">Tujuan / Nama SPPG</label>
+                <input id="sppgTujuan" placeholder="Nama SPPG penerima">
+              </div>
+              <div class="dist-field">
+                <label for="sppgCatatan">Catatan (opsional)</label>
+                <textarea id="sppgCatatan" rows="2" placeholder="Catatan tambahan"></textarea>
+              </div>
+
+              <div class="dist-field">
+                <label>Barang dalam Nota Ini</label>
+                <div class="nota-item-rows" id="sppgItemRows"></div>
+                <button type="button" class="btn-ghost nota-add-btn" id="btnTambahBarangSppg">+ Tambah Barang</button>
+              </div>
+
+              <button type="button" class="btn btn--block" id="btnSaveSppg">Simpan Nota Pengiriman</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditSppg">Batal Edit</button>
+              <div class="shared-note">Data ini tersimpan bersama secara real-time, terpisah dari data pembelian.</div>
+            </div>
+            <div>
+              <div class="date-filter-row">
+                <input type="date" id="sppgFilterDari" aria-label="Dari tanggal">
+                <span class="date-filter-sep">–</span>
+                <input type="date" id="sppgFilterSampai" aria-label="Sampai tanggal">
+                <button type="button" class="filter-reset" id="btnSppgFilterReset">Reset</button>
+                <button type="button" class="btn-ghost download-btn" id="btnDownloadSppg">⬇ Download (CSV)</button>
+              </div>
+              <div class="dist-log" id="sppgLog"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- LAPORAN KEUANGAN KOPERASI -->
+        <section class="page" data-module="koperasi" data-page="laporankeuangan" id="page-koperasi-laporankeuangan">
+          <div class="section-head">
+            <div class="eyebrow">Koperasi Yayasan</div>
+            <h2>Laporan Keuangan Koperasi</h2>
+            <p>Gabungan Pembelian (pengeluaran) &amp; Distribusi ke SPPG (pemasukan), mirip buku kas — untuk dibagikan resmi ke kepala yayasan.</p>
+          </div>
+
+          <div class="date-filter-row">
+            <input type="date" id="lkFilterDari" aria-label="Dari tanggal">
+            <span class="date-filter-sep">–</span>
+            <input type="date" id="lkFilterSampai" aria-label="Sampai tanggal">
+            <button type="button" class="filter-reset" id="btnLkFilterReset">Reset</button>
+          </div>
+
+          <div class="totals-row koperasi-totals koperasi-totals--3col">
+            <div class="total-card">
+              <div class="lbl">Total Pemasukan</div>
+              <div class="val" id="lkTotalPemasukan">–</div>
+            </div>
+            <div class="total-card amber">
+              <div class="lbl">Total Pengeluaran</div>
+              <div class="val" id="lkTotalPengeluaran">–</div>
+            </div>
+            <div class="total-card alt" id="lkSaldoCard">
+              <div class="lbl" id="lkSaldoLabel">Laba/Rugi Bersih</div>
+              <div class="val" id="lkSaldo">–</div>
+            </div>
+          </div>
+
+          <div class="laporan-download-row">
+            <button type="button" class="btn" id="btnDownloadLkPdf">⬇ Download Laporan (PDF)</button>
+            <button type="button" class="btn-ghost" id="btnDownloadLkCsv">⬇ Download Data Mentah (CSV/Excel)</button>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Rincian Transaksi</h3>
+            <p>Semua Pembelian &amp; Distribusi ke SPPG dalam periode ini, diurutkan per tanggal.</p>
+          </div>
+          <div class="fin-panel">
+            <div class="fin-head fin-head--ledger">
+              <div>Tanggal</div>
+              <div>Keterangan</div>
+              <div>Jenis</div>
+              <div>Jumlah</div>
+            </div>
+            <div id="lkLedger"></div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Pengeluaran per Jenis Barang</h3>
+          </div>
+          <div class="fin-panel">
+            <div class="fin-head fin-head--2col">
+              <div>Barang</div>
+              <div>Total</div>
+            </div>
+            <div id="lkBreakdownPengeluaran"></div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Pemasukan per SPPG Tujuan</h3>
+          </div>
+          <div class="fin-panel">
+            <div class="fin-head fin-head--2col">
+              <div>SPPG</div>
+              <div>Total</div>
+            </div>
+            <div id="lkBreakdownPemasukan"></div>
+          </div>
+        </section>
+
+        <!-- ===== BERSAMA (bisa diakses dari modul mana pun) ===== -->
+
+        <!-- RIWAYAT AKTIVITAS -->
+        <section class="page" data-module="shared" data-page="aktivitas" id="page-aktivitas">
+          <div class="section-head">
+            <div class="eyebrow">Transparansi Tim</div>
+            <h2>Riwayat Aktivitas</h2>
+            <p>Catatan siapa menambah, mengubah, atau menghapus data — di seluruh situs, termasuk data yang sudah dihapus.</p>
+          </div>
+          <div class="date-filter-row activity-filter-row">
+            <select id="aktivitasFilterModul" aria-label="Filter modul"></select>
+            <select id="aktivitasFilterAksi" aria-label="Filter aksi">
+              <option value="all">Semua Aksi</option>
+              <option value="tambah">Tambah</option>
+              <option value="ubah">Ubah</option>
+              <option value="hapus">Hapus</option>
+            </select>
+            <input type="text" id="aktivitasFilterOleh" placeholder="Cari berdasarkan email...">
+            <input type="date" id="aktivitasFilterDari" aria-label="Dari tanggal">
+            <span class="date-filter-sep">–</span>
+            <input type="date" id="aktivitasFilterSampai" aria-label="Sampai tanggal">
+            <button type="button" class="filter-reset" id="btnAktivitasFilterReset">Reset</button>
+          </div>
+          <div class="dist-log" id="aktivitasLog"></div>
+        </section>
+
+        <footer>Yayasan Rumah Sehat Indonesia · ARSI · Dibuat sebagai alat bantu monitoring internal</footer>
+      </main>
+    </div>
+  </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=8"></script>
+<script type="module" src="js/main.js?v=10"></script>
 </body>
 </html>

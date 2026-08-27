@@ -1,17 +1,11 @@
 // ---------- Rekap Keuangan (dihitung otomatis dari data pengiriman) ----------
 import { state } from './state.js';
-import { formatRupiah, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, isDateStrInRange, escapeHtml } from './utils.js';
 import { renderDistItemHtml, wireDistItemActions } from './ui-dist-item.js';
+import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
-export function renderKeuangan() {
-  const bulanIniEl = document.getElementById('finBulanIni');
-  const semuaEl = document.getElementById('finSemua');
-  const piutangEl = document.getElementById('finPiutang');
-  const tableEl = document.getElementById('finTable');
-  const piutangListEl = document.getElementById('piutangList');
-  const metodeTableEl = document.getElementById('finMetodeTable');
-  if (!bulanIniEl) return;
-
+/** Dipakai bersama oleh halaman Keuangan dan ringkasan Beranda, supaya hitungannya satu sumber. */
+export function computeKeuanganSummary() {
   const curYm = new Date().toISOString().slice(0, 7);
 
   let totalBulanIni = 0, totalSemua = 0, totalPiutang = 0;
@@ -40,6 +34,20 @@ export function renderKeuangan() {
       piutangItems.push(it);
     }
   });
+
+  return { totalBulanIni, totalSemua, totalPiutang, perProduk, perMetode, piutangItems };
+}
+
+export function renderKeuangan() {
+  const bulanIniEl = document.getElementById('finBulanIni');
+  const semuaEl = document.getElementById('finSemua');
+  const piutangEl = document.getElementById('finPiutang');
+  const tableEl = document.getElementById('finTable');
+  const piutangListEl = document.getElementById('piutangList');
+  const metodeTableEl = document.getElementById('finMetodeTable');
+  if (!bulanIniEl) return;
+
+  const { totalBulanIni, totalSemua, totalPiutang, perProduk, perMetode, piutangItems } = computeKeuanganSummary();
 
   bulanIniEl.textContent = formatRupiah(totalBulanIni);
   semuaEl.textContent = formatRupiah(totalSemua);
@@ -76,4 +84,39 @@ export function renderKeuangan() {
         </div>
       `).join('');
   }
+}
+
+export function downloadLaporanKeuangan() {
+  const dari = document.getElementById('keuanganFilterDari').value;
+  const sampai = document.getElementById('keuanganFilterSampai').value;
+  const items = (!dari && !sampai)
+    ? state.lastDistItems
+    : state.lastDistItems.filter(it => isDateStrInRange(it.tanggalKirim || it.tanggal, dari, sampai));
+
+  if (items.length === 0) {
+    alert('Tidak ada data pengiriman untuk rentang tanggal ini.');
+    return;
+  }
+
+  const headers = ['Tanggal Kirim', 'Tanggal Pesan', 'Tujuan', 'Produk', 'Jumlah', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)', 'Status Bayar', 'Metode Bayar', 'Keterangan', 'Diinput Oleh'];
+  const rows = items.map(it => [
+    formatDate(it.tanggalKirim || it.tanggal), formatDate(it.tanggalPesan || it.tanggal), it.tujuan,
+    it.produkNama || '', it.jumlah, it.satuan || '', it.hargaSatuan ?? '', it.total ?? '',
+    it.dibayar ? 'Lunas' : 'Belum Dibayar', it.metodeBayar || '', it.keterangan || '', it.createdBy || '',
+  ]);
+
+  let totalLunas = 0, totalPiutang = 0;
+  items.forEach(it => {
+    const total = typeof it.total === 'number' ? it.total : 0;
+    if (it.dibayar) totalLunas += total; else totalPiutang += total;
+  });
+  rows.push([]);
+  rows.push(['TOTAL PEMASUKAN (LUNAS)', '', '', '', '', '', '', totalLunas]);
+  rows.push(['TOTAL PIUTANG (BELUM DIBAYAR)', '', '', '', '', '', '', totalPiutang]);
+
+  downloadCsv(`Laporan-Keuangan-RSI-${dateRangeFileTag(dari, sampai)}.csv`, headers, rows);
+}
+
+export function initKeuanganReportEvents() {
+  document.getElementById('btnDownloadKeuangan').addEventListener('click', downloadLaporanKeuangan);
 }

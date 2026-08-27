@@ -5,12 +5,29 @@ import { doc, deleteDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10
 import { state } from './state.js';
 import { produkById, produkLabel, PRODUK } from './data.js';
 import { formatDate, formatRupiah, escapeHtml } from './utils.js';
+import { logActivity } from './activity-log.js';
+
+function findDistItem(id) {
+  return state.lastDistItems.find(it => it.id === id);
+}
+
+let onEditCb = null;
+/** Didaftarkan oleh ui-distribusi.js supaya tombol edit di sini bisa memicu mode edit form-nya, tanpa saling impor melingkar. */
+export function setDistEditHandler(fn) { onEditCb = fn; }
 
 export async function deletePengiriman(id) {
   if (!id) return;
   if (!confirm('Hapus catatan pengiriman ini? Tindakan ini tidak bisa dibatalkan.')) return;
+  const item = findDistItem(id);
   try {
     await deleteDoc(doc(state.db, 'pengiriman', id));
+    if (item) {
+      logActivity({
+        action: 'hapus',
+        modul: 'Distribusi',
+        ringkasan: `Hapus pengiriman ${item.jumlah} ${item.satuan || ''} (${item.produkNama || ''}) ke ${item.tujuan}`,
+      });
+    }
   } catch (e) {
     console.error(e);
     alert('Gagal menghapus. Pastikan Anda sudah login dan aturan Firestore mengizinkan hapus.');
@@ -19,9 +36,17 @@ export async function deletePengiriman(id) {
 
 export async function markLunas(id, btnEl, metodeBayar) {
   if (!id) return;
+  const item = findDistItem(id);
   btnEl.disabled = true; btnEl.textContent = 'Menyimpan...';
   try {
     await updateDoc(doc(state.db, 'pengiriman', id), { dibayar: true, metodeBayar: metodeBayar || 'Tunai' });
+    if (item) {
+      logActivity({
+        action: 'ubah',
+        modul: 'Distribusi',
+        ringkasan: `Tandai lunas: ${item.tujuan} · ${metodeBayar || 'Tunai'}`,
+      });
+    }
   } catch (e) {
     console.error(e);
     alert('Gagal menandai lunas.');
@@ -43,10 +68,13 @@ export function renderDistItemHtml(it, opts = {}) {
   const tglKirim = it.tanggalKirim || it.tanggal;
   const lunas = !!it.dibayar;
 
+  const diinputOleh = it.createdBy ? `<div class="meta">Diinput oleh ${escapeHtml(it.createdBy)}</div>` : '';
+
   const meta = opts.showProdukMeta
     ? `<div class="meta">${escapeHtml(namaProduk)}${it.tipeHarga ? ' · ' + escapeHtml(it.tipeHarga) : ''}${it.keterangan ? ' · ' + escapeHtml(it.keterangan) : ''}</div>
-       <div class="meta">Pesan: ${formatDate(it.tanggalPesan || it.tanggal)} → Kirim: ${formatDate(tglKirim)}</div>`
-    : `<div class="meta">${escapeHtml(namaProduk)} · Kirim: ${formatDate(tglKirim)}</div>`;
+       <div class="meta">Pesan: ${formatDate(it.tanggalPesan || it.tanggal)} → Kirim: ${formatDate(tglKirim)}</div>
+       ${diinputOleh}`
+    : `<div class="meta">${escapeHtml(namaProduk)} · Kirim: ${formatDate(tglKirim)}</div>${diinputOleh}`;
 
   const amount = opts.showProdukMeta
     ? `<div class="qty">${it.jumlah} ${escapeHtml(satuan)}</div>
@@ -68,6 +96,7 @@ export function renderDistItemHtml(it, opts = {}) {
         ${amount}
         <div class="dist-item-actions">
           ${payAction}
+          <button class="edit-btn" data-editid="${it.id}" title="Edit catatan ini">✏️</button>
           <button class="del-btn" data-delid="${it.id}" title="Hapus catatan ini">🗑</button>
         </div>
       </div>
@@ -85,5 +114,11 @@ export function wireDistItemActions(containerEl) {
   });
   containerEl.querySelectorAll('button.del-btn').forEach(btn => {
     btn.addEventListener('click', () => deletePengiriman(btn.dataset.delid));
+  });
+  containerEl.querySelectorAll('button.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = findDistItem(btn.dataset.editid);
+      if (item && onEditCb) onEditCb(item);
+    });
   });
 }

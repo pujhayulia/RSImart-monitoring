@@ -2,7 +2,9 @@
 import { doc, setDoc, getDoc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
 import { ICONS, PRODUK_NON_GALON, SEED_DATE, SEED_GUDANG } from './data.js';
-import { formatDate } from './utils.js';
+import { formatDate, escapeHtml, isDateStrInRange } from './utils.js';
+import { logActivity } from './activity-log.js';
+import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
 export function renderGudang(rekap) {
   const box = document.getElementById('gudangBox');
@@ -29,6 +31,7 @@ export function renderGudang(rekap) {
         ${hasData ?
           `<div class="jug-stats"><span class="isi">Isi: ${rekap.isi} galon</span><span class="kosong">Kosong: ${rekap.kosong} galon</span></div>`
           : `<div class="no-data no-data--inline">Belum ada data</div>`}
+        ${rekap.updatedBy ? `<div class="meta">Terakhir diupdate oleh ${escapeHtml(rekap.updatedBy)}</div>` : ''}
       </div>
     </div>`;
   document.getElementById('totalIsi').textContent = (rekap.isi ?? '–') + ' galon';
@@ -71,10 +74,15 @@ export async function ensureSeedGudang() {
   }
 }
 
-export function watchGudangDates() {
+let onGudangChange = () => {};
+
+export function watchGudangDates(onChange) {
+  if (onChange) onGudangChange = onChange;
   onSnapshot(collection(state.db, 'rekap'), (qs) => {
     const dates = [];
-    qs.forEach(d => dates.push(d.id));
+    state.allGudangHistory = [];
+    qs.forEach(d => { dates.push(d.id); state.allGudangHistory.push({ tanggal: d.id, ...d.data() }); });
+    state.allGudangHistory.sort((a, b) => (a.tanggal < b.tanggal ? 1 : -1));
     if (dates.length === 0) return;
     dates.sort().reverse();
     const sel = document.getElementById('rekapDateSelect');
@@ -94,7 +102,10 @@ export function watchGudangDates() {
 export function watchSelectedGudang(date) {
   if (state.gudangUnsub) state.gudangUnsub();
   state.gudangUnsub = onSnapshot(doc(state.db, 'rekap', date), (snap) => {
-    renderGudang(snap.exists() ? snap.data() : null);
+    const data = snap.exists() ? snap.data() : null;
+    state.currentGudangData = data;
+    renderGudang(data);
+    onGudangChange();
   }, (err) => console.error('Gagal memuat stok gudang', err));
 }
 
@@ -117,12 +128,18 @@ export async function saveGudang() {
     kosong: kosong === '' ? null : Number(kosong),
     peredaran: peredaran === '' ? null : Number(peredaran),
     stokProduk,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    updatedBy: state.currentUserEmail,
   };
   const btn = document.getElementById('btnSaveRekap');
   btn.disabled = true; btn.textContent = 'Menyimpan...';
   try {
     await setDoc(doc(state.db, 'rekap', dateInput), rekap);
+    logActivity({
+      action: 'ubah',
+      modul: 'Stok Gudang RSI',
+      ringkasan: `Update stok gudang tanggal ${formatDate(dateInput)}: isi ${rekap.isi ?? '-'} galon, kosong ${rekap.kosong ?? '-'} galon`,
+    });
     document.getElementById('formPanel').classList.remove('open');
     state.currentDate = dateInput;
     watchSelectedGudang(dateInput);
@@ -139,4 +156,37 @@ export async function saveGudang() {
   } finally {
     btn.disabled = false; btn.textContent = 'Simpan Stok Gudang';
   }
+}
+
+export function downloadLaporanGudang() {
+  const dari = document.getElementById('gudangFilterDari').value;
+  const sampai = document.getElementById('gudangFilterSampai').value;
+  const rows = state.allGudangHistory.filter(r => isDateStrInRange(r.tanggal, dari, sampai));
+
+  if (rows.length === 0) {
+    alert('Tidak ada data riwayat stok gudang untuk rentang tanggal ini.');
+    return;
+  }
+
+  const headers = ['Tanggal', 'Stok Isi Galon', 'Stok Kosong Galon', 'Peredaran Galon',
+    ...PRODUK_NON_GALON.map(p => `${p.name} - ${p.size} (${p.satuan})`), 'Diupdate Oleh'];
+
+  const csvRows = rows.map(r => [
+    formatDate(r.tanggal), r.isi ?? '', r.kosong ?? '', r.peredaran ?? '',
+    ...PRODUK_NON_GALON.map(p => (r.stokProduk && r.stokProduk[p.id] != null) ? r.stokProduk[p.id] : ''),
+    r.updatedBy || '',
+  ]);
+
+  const latest = rows[0]; // allGudangHistory sudah terurut terbaru dulu
+  csvRows.push([]);
+  csvRows.push(['RINGKASAN (data terbaru dalam rentang, ' + formatDate(latest.tanggal) + ')']);
+  csvRows.push(['Stok Isi Galon', latest.isi ?? '-']);
+  csvRows.push(['Stok Kosong Galon', latest.kosong ?? '-']);
+  csvRows.push(['Jumlah Peredaran Galon', latest.peredaran ?? '-']);
+
+  downloadCsv(`Laporan-Stok-Gudang-RSI-${dateRangeFileTag(dari, sampai)}.csv`, headers, csvRows);
+}
+
+export function initGudangReportEvents() {
+  document.getElementById('btnDownloadGudang').addEventListener('click', downloadLaporanGudang);
 }

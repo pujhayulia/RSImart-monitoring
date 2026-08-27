@@ -110,12 +110,15 @@ async function handleForgotPassword(e) {
 }
 
 export function showApp(user) {
+  state.currentUserEmail = user.email || '';
   document.getElementById('authOverlay').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
-  document.getElementById('userEmailPill').textContent = user.email || '';
+  document.querySelectorAll('.js-user-email-pill').forEach(el => { el.textContent = state.currentUserEmail; });
 }
 
 export function showAuthOverlay() {
+  state.currentUserEmail = '';
+  state.activeModule = null;
   document.getElementById('mainApp').classList.add('hidden');
   document.getElementById('authOverlay').classList.remove('hidden');
   document.getElementById('authForm').reset();
@@ -129,9 +132,11 @@ export function initAuthUI() {
     setAuthMode(state.authMode === 'login' ? 'register' : 'login');
   });
   document.getElementById('authForgotLink').addEventListener('click', handleForgotPassword);
-  document.getElementById('btnLogout').addEventListener('click', (e) => {
-    e.preventDefault();
-    signOut(state.auth);
+  document.querySelectorAll('.js-btn-logout').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      signOut(state.auth);
+    });
   });
   setAuthMode('login');
 }

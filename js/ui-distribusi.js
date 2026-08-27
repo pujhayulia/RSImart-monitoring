@@ -1,10 +1,13 @@
 // ---------- Distribusi & Pengiriman (form, log, estimasi harga) ----------
-import { collection, addDoc, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { collection, addDoc, doc, updateDoc, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
 import { PRODUK, produkLabel, produkById, priceFor } from './data.js';
 import { formatRupiah } from './utils.js';
-import { renderDistItemHtml, wireDistItemActions } from './ui-dist-item.js';
+import { renderDistItemHtml, wireDistItemActions, setDistEditHandler } from './ui-dist-item.js';
 import { ensureLokasiTersimpan } from './ui-lokasi.js';
+import { logActivity } from './activity-log.js';
+
+let editingId = null;
 
 export function initProdukSelects() {
   const opts = PRODUK.map(p => `<option value="${p.id}">${produkLabel(p)}</option>`).join('');
@@ -19,6 +22,8 @@ export function initProdukSelects() {
   document.getElementById('distTipeHarga').addEventListener('change', updateEstimasi);
   document.getElementById('distJumlah').addEventListener('input', updateEstimasi);
   document.getElementById('distDibayar').addEventListener('change', toggleMetodeWrap);
+  document.getElementById('btnCancelEditDist').addEventListener('click', cancelEditDistribusi);
+  setDistEditHandler(startEditDistribusi);
 
   updateHargaUI();
   toggleMetodeWrap();
@@ -86,6 +91,38 @@ export function watchDistribusi(onChange) {
   });
 }
 
+function startEditDistribusi(item) {
+  editingId = item.id;
+  document.getElementById('distTanggalPesan').value = item.tanggalPesan || item.tanggal || '';
+  document.getElementById('distTanggalKirim').value = item.tanggalKirim || item.tanggal || '';
+  document.getElementById('distTujuan').value = item.tujuan || '';
+  document.getElementById('distProduk').value = item.produkId || '';
+  updateHargaUI();
+  if (item.tipeHarga) document.getElementById('distTipeHarga').value = item.tipeHarga;
+  document.getElementById('distJumlah').value = item.jumlah ?? '';
+  document.getElementById('distDibayar').value = item.dibayar ? 'sudah' : 'belum';
+  toggleMetodeWrap();
+  if (item.metodeBayar) document.getElementById('distMetodeBayar').value = item.metodeBayar;
+  document.getElementById('distKeterangan').value = item.keterangan || '';
+  updateEstimasi();
+
+  document.getElementById('btnSaveDist').textContent = 'Update Pengiriman';
+  document.getElementById('btnCancelEditDist').classList.remove('hidden');
+  document.getElementById('distTujuan').closest('.dist-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEditDistribusi() {
+  editingId = null;
+  document.getElementById('distTujuan').value = '';
+  document.getElementById('distJumlah').value = '';
+  document.getElementById('distKeterangan').value = '';
+  document.getElementById('distDibayar').value = 'belum';
+  toggleMetodeWrap();
+  updateEstimasi();
+  document.getElementById('btnSaveDist').textContent = 'Simpan Pengiriman';
+  document.getElementById('btnCancelEditDist').classList.add('hidden');
+}
+
 export async function saveDistribusi() {
   const tanggalPesan = document.getElementById('distTanggalPesan').value;
   const tanggalKirim = document.getElementById('distTanggalKirim').value;
@@ -104,6 +141,7 @@ export async function saveDistribusi() {
   }
   const hargaSatuan = priceFor(produk, tipeHarga);
   const total = hargaSatuan * Number(jumlah);
+  const isEdit = !!editingId;
 
   const entry = {
     tanggal: tanggalKirim, // dipakai untuk kompatibilitas & pengelompokan bulan di keuangan
@@ -119,23 +157,45 @@ export async function saveDistribusi() {
     dibayar,
     metodeBayar,
     keterangan,
-    createdAt: Date.now()
   };
+  if (isEdit) {
+    entry.updatedAt = Date.now();
+    entry.updatedBy = state.currentUserEmail;
+  } else {
+    entry.createdAt = Date.now();
+    entry.createdBy = state.currentUserEmail;
+  }
+
   const btn = document.getElementById('btnSaveDist');
   btn.disabled = true; btn.textContent = 'Menyimpan...';
   try {
-    await addDoc(collection(state.db, 'pengiriman'), entry);
-    await ensureLokasiTersimpan(tujuan);
-    document.getElementById('distTujuan').value = '';
-    document.getElementById('distJumlah').value = '';
-    document.getElementById('distKeterangan').value = '';
-    document.getElementById('distDibayar').value = 'belum';
-    toggleMetodeWrap();
-    updateEstimasi();
+    if (isEdit) {
+      await updateDoc(doc(state.db, 'pengiriman', editingId), entry);
+      logActivity({
+        action: 'ubah',
+        modul: 'Distribusi',
+        ringkasan: `Update pengiriman ${entry.jumlah} ${entry.satuan} (${entry.produkNama}) ke ${tujuan}`,
+      });
+      cancelEditDistribusi();
+    } else {
+      await addDoc(collection(state.db, 'pengiriman'), entry);
+      logActivity({
+        action: 'tambah',
+        modul: 'Distribusi',
+        ringkasan: `Pengiriman ${entry.jumlah} ${entry.satuan} (${entry.produkNama}) ke ${tujuan}`,
+      });
+      await ensureLokasiTersimpan(tujuan);
+      document.getElementById('distTujuan').value = '';
+      document.getElementById('distJumlah').value = '';
+      document.getElementById('distKeterangan').value = '';
+      document.getElementById('distDibayar').value = 'belum';
+      toggleMetodeWrap();
+      updateEstimasi();
+    }
   } catch (e) {
     console.error(e);
     alert('Gagal menyimpan data pengiriman. Pastikan Anda sudah login dan aturan Firestore sudah benar.');
   } finally {
-    btn.disabled = false; btn.textContent = 'Simpan Pengiriman';
+    btn.disabled = false; btn.textContent = editingId ? 'Update Pengiriman' : 'Simpan Pengiriman';
   }
 }

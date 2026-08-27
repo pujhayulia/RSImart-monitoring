@@ -5,15 +5,25 @@ import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebas
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 import { state, setStatus } from './state.js';
-import { todayIso } from './utils.js';
+import { todayIso, formatRupiah, monthRange } from './utils.js';
+import { initRouter } from './router.js';
 import { initAuthUI, watchAuthState } from './auth.js';
-import { renderProdukGrid } from './ui-katalog.js';
+import { renderProdukGrid, initKatalogEvents } from './ui-katalog.js';
 import {
-  ensureSeedGudang, watchGudangDates, watchSelectedGudang, saveGudang, renderStokProdukFormInputs
+  ensureSeedGudang, watchGudangDates, watchSelectedGudang, saveGudang, renderStokProdukFormInputs,
+  initGudangReportEvents
 } from './ui-gudang.js';
 import { ensureSeedLokasi, watchLokasi } from './ui-lokasi.js';
 import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog } from './ui-distribusi.js';
-import { renderKeuangan } from './ui-keuangan.js';
+import { renderKeuangan, initKeuanganReportEvents } from './ui-keuangan.js';
+import { renderBeranda } from './ui-beranda.js';
+import { watchPembelian, initPembelianEvents } from './ui-pembelian.js';
+import { watchDistribusiSppg, initDistribusiSppgEvents } from './ui-distribusi-sppg.js';
+import { renderBerandaKoperasi, initBerandaKoperasiEvents } from './ui-beranda-koperasi.js';
+import {
+  computeKoperasiKeuangan, renderLaporanKeuanganKoperasi, initLaporanKeuanganKoperasiEvents
+} from './ui-laporan-keuangan-koperasi.js';
+import { watchActivityLog, initActivityLogEvents } from './activity-log.js';
 
 const configLooksEmpty = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('GANTI_DENGAN');
 
@@ -27,6 +37,18 @@ function showConfigWarning() {
   warn.innerHTML = '⚠️ <b>Firebase belum dikonfigurasi.</b> Buka file <code>js/firebase-config.js</code> dan isi dengan konfigurasi project Firebase Anda (lihat README.md).';
   document.body.insertBefore(warn, document.getElementById('mainApp'));
   setStatus(false);
+}
+
+function renderLandingStats() {
+  const stokEl = document.getElementById('landingStokGalon');
+  if (!stokEl) return;
+  const rekap = state.currentGudangData;
+  stokEl.textContent = (rekap && rekap.isi !== null && rekap.isi !== undefined) ? `${rekap.isi} galon` : '–';
+
+  const { dari, sampai } = monthRange();
+  const data = computeKoperasiKeuangan(dari, sampai);
+  document.getElementById('landingPembelianBulanIni').textContent = formatRupiah(data.totalPengeluaran);
+  document.getElementById('landingDistribusiBulanIni').textContent = formatRupiah(data.totalPemasukan);
 }
 
 function initEvents() {
@@ -50,11 +72,30 @@ function initEvents() {
     watchSelectedGudang(state.currentDate);
   });
   document.getElementById('btnSaveDist').addEventListener('click', saveDistribusi);
+  initGudangReportEvents();
+  initKeuanganReportEvents();
+  initPembelianEvents();
+  initDistribusiSppgEvents();
+  initBerandaKoperasiEvents();
+  initLaporanKeuanganKoperasiEvents();
+  initActivityLogEvents();
+}
+
+function onGudangChange() {
+  renderBeranda();
+  renderLandingStats();
 }
 
 function onDistribusiChange() {
   renderDistLog();
   renderKeuangan();
+  renderBeranda();
+}
+
+function onKoperasiDataChange() {
+  renderBerandaKoperasi();
+  renderLaporanKeuanganKoperasi();
+  renderLandingStats();
 }
 
 async function startAppData() {
@@ -63,9 +104,12 @@ async function startAppData() {
   try {
     await ensureSeedGudang();
     await ensureSeedLokasi();
-    watchGudangDates();
+    watchGudangDates(onGudangChange);
     watchLokasi();
     watchDistribusi(onDistribusiChange);
+    watchPembelian(onKoperasiDataChange);
+    watchDistribusiSppg(onKoperasiDataChange);
+    watchActivityLog();
   } catch (e) {
     console.error('Gagal inisialisasi data', e);
   }
@@ -73,10 +117,17 @@ async function startAppData() {
 
 async function init() {
   renderProdukGrid();
+  initKatalogEvents();
   initProdukSelects();
   initEvents();
+  initRouter((module, page) => {
+    if (module === 'rsi' && page === 'beranda') renderBeranda();
+    if (module === 'koperasi' && page === 'beranda') renderBerandaKoperasi();
+    if (module === 'koperasi' && page === 'laporankeuangan') renderLaporanKeuanganKoperasi();
+  });
   document.getElementById('distTanggalPesan').value = todayIso();
   document.getElementById('distTanggalKirim').value = todayIso();
+  document.getElementById('sppgTanggalKirim').value = todayIso();
 
   if (configLooksEmpty) {
     showConfigWarning();
