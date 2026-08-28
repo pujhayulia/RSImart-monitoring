@@ -106,7 +106,15 @@ sembarang orang dari luar situs Anda.
          allow read: if true;
          allow write: if request.auth != null;
        }
+       match /poSppg/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
        match /pembelianBahanMakanan/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /biayaOperasional/{id} {
          allow read: if true;
          allow write: if request.auth != null;
        }
@@ -193,15 +201,52 @@ melihat data yang sama secara real-time.
 - **Distribusi**: setiap pengiriman galon (ke lokasi lama maupun baru) dicatat
   di sini, jadi ke mana pun barang dikirim akan tetap terdata.
 - **Koperasi Bahan Makanan**: modul terpisah dari Web RSI (sidebar & halaman
-  sendiri), dengan collection Firestore sendiri (`pembelianBahanMakanan` dan
-  `distribusiSppg`) — strukturnya beda:
+  sendiri), dengan collection Firestore sendiri (`poSppg`,
+  `pembelianBahanMakanan`, dan `distribusiSppg`) — strukturnya beda:
+  - **PO dari SPPG**: satu **PO** = satu dokumen, berisi array `items` (barang
+    yang dipesan). Berjalan lewat status: *Menunggu Pembelian* → (koperasi
+    konfirmasi harga hasil belanja) → *Menunggu Persetujuan SPPG* →
+    *Disetujui*/*Ditolak* → (nota pengiriman dibuat) → *Terkirim*. PO yang
+    **Disetujui** bisa langsung dijadikan Nota Pengiriman lewat tombol "Buat
+    Nota Pengiriman →" (form Distribusi SPPG terisi otomatis dari PO). Ada
+    tiga dokumen PDF yang bisa dicetak di tahap berbeda: PO **Menunggu
+    Persetujuan** → **"Cetak Konfirmasi Harga"** (tabel perbandingan harga
+    rencana vs final beserta selisihnya, untuk ditinjau SPPG); PO
+    **Disetujui** → **"Cetak Persetujuan Harga"** (harga final yang sudah
+    disepakati); PO **Terkirim** → **Invoice/Berita Acara** resmi — nomor
+    invoice otomatis (format `INV/{tahun}/{urut}`), kop surat & info rekening
+    koperasi diatur di `js/data.js` (`KOPERASI_INFO`). Halaman ini juga punya
+    tombol **"Import Arsip Sekarang"** (muncul otomatis kalau belum pernah
+    dijalankan) untuk memasukkan arsip PO lama (Maret–Agustus 2026, data dari
+    file Excel koperasi) sebagai riwayat berstatus "Terkirim" — sumber
+    datanya ada di `js/po-lama-data.js`, aman diklik berkali-kali karena
+    dicek dulu lewat penanda `importBatch` sebelum menyimpan ulang.
   - **Pembelian**: satu barang yang dibeli = satu dokumen tersendiri, dengan
-    tanggal & jam otomatis dari Firestore server timestamp.
+    tanggal & jam otomatis dari Firestore server timestamp. Bisa opsional
+    dikaitkan ke satu barang di PO tertentu ("Kaitkan ke PO") — cocok kalau
+    satu barang di PO dibeli dari beberapa toko/supplier berbeda dalam
+    beberapa transaksi. Setiap barang PO (status "Menunggu Pembelian")
+    menunjukkan berapa yang sudah dibeli dari toko mana saja dan sisanya,
+    dihitung otomatis dari seluruh Pembelian yang tertaut ke barang itu
+    (`poId` + `poItemId`, tidak butuh input manual "stok" terpisah).
+  - **Margin & Profit**: begitu ada Pembelian yang tertaut ke barang PO, kartu
+    PO menampilkan **Margin** per barang (harga jual PO dikurangi realisasi
+    beli riil dari Pembelian, meniru kolom "Margin per PO"/"Margin Satuan
+    Item" di LPJ Pengadaan Bahan Baku koperasi) beserta totalnya per PO. Di
+    Beranda Koperasi & Laporan Keuangan Koperasi ada kartu **Margin Kotor**
+    (jumlah margin semua PO pada rentang tanggal `tanggalPo`), **Biaya
+    Operasional** (dari halaman Biaya Operasional di bawah), dan **Total
+    Profit Real** = Margin Kotor − Biaya Operasional.
+  - **Biaya Operasional**: catatan pengeluaran di luar pembelian barang (mis.
+    e-toll, ongkos kirim/lalamove) — collection `biayaOperasional`, satu
+    dokumen per catatan, dengan tanggal/lokasi/kategori (Operasional
+    Koperasi atau Operasional Dapur)/keterangan/jumlah.
   - **Distribusi ke SPPG**: satu **nota pengiriman** = satu dokumen, berisi
     array `items` yang bisa memuat banyak barang sekaligus. Tanggal & jam
     kirim diisi manual (sesuai kapan barang benar-benar dikirim), sedangkan
     waktu pencatatan ke sistem tetap otomatis (server timestamp) — keduanya
-    disimpan terpisah.
+    disimpan terpisah. Nota yang dibuat dari sebuah PO (lewat "Buat Nota
+    Pengiriman →") menyimpan `poId` supaya tertaut balik ke PO asalnya.
 - **Riwayat Aktivitas**: transparansi tim — setiap tambah/ubah/hapus data di
   kedua modul tercatat di collection `activityLog` (siapa, kapan, ringkasan
   perubahan), termasuk jejak data yang sudah dihapus. Bisa diakses dari

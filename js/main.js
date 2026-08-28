@@ -17,8 +17,10 @@ import { ensureSeedLokasi, watchLokasi } from './ui-lokasi.js';
 import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog } from './ui-distribusi.js';
 import { renderKeuangan, initKeuanganReportEvents } from './ui-keuangan.js';
 import { renderBeranda } from './ui-beranda.js';
-import { watchPembelian, initPembelianEvents } from './ui-pembelian.js';
-import { watchDistribusiSppg, initDistribusiSppgEvents } from './ui-distribusi-sppg.js';
+import { watchPembelian, initPembelianEvents, refreshPoOptions } from './ui-pembelian.js';
+import { watchDistribusiSppg, initDistribusiSppgEvents, prefillFromPo } from './ui-distribusi-sppg.js';
+import { watchPoSppg, initPoSppgEvents } from './ui-po-sppg.js';
+import { watchBiayaOperasional, initBiayaOperasionalEvents } from './ui-biaya-operasional.js';
 import { renderBerandaKoperasi, initBerandaKoperasiEvents } from './ui-beranda-koperasi.js';
 import {
   computeKoperasiKeuangan, renderLaporanKeuanganKoperasi, initLaporanKeuanganKoperasiEvents
@@ -74,6 +76,8 @@ function initEvents() {
   document.getElementById('btnSaveDist').addEventListener('click', saveDistribusi);
   initGudangReportEvents();
   initKeuanganReportEvents();
+  initPoSppgEvents();
+  initBiayaOperasionalEvents();
   initPembelianEvents();
   initDistribusiSppgEvents();
   initBerandaKoperasiEvents();
@@ -96,6 +100,7 @@ function onKoperasiDataChange() {
   renderBerandaKoperasi();
   renderLaporanKeuanganKoperasi();
   renderLandingStats();
+  refreshPoOptions();
 }
 
 async function startAppData() {
@@ -107,6 +112,8 @@ async function startAppData() {
     watchGudangDates(onGudangChange);
     watchLokasi();
     watchDistribusi(onDistribusiChange);
+    watchPoSppg(onKoperasiDataChange);
+    watchBiayaOperasional(onKoperasiDataChange);
     watchPembelian(onKoperasiDataChange);
     watchDistribusiSppg(onKoperasiDataChange);
     watchActivityLog();
@@ -124,10 +131,16 @@ async function init() {
     if (module === 'rsi' && page === 'beranda') renderBeranda();
     if (module === 'koperasi' && page === 'beranda') renderBerandaKoperasi();
     if (module === 'koperasi' && page === 'laporankeuangan') renderLaporanKeuanganKoperasi();
+    if (module === 'koperasi' && page === 'distribusisppg' && state.poPrefill) {
+      prefillFromPo(state.poPrefill);
+      state.poPrefill = null;
+    }
   });
   document.getElementById('distTanggalPesan').value = todayIso();
   document.getElementById('distTanggalKirim').value = todayIso();
   document.getElementById('sppgTanggalKirim').value = todayIso();
+  document.getElementById('poTanggal').value = todayIso();
+  document.getElementById('biayaOpTanggal').value = todayIso();
 
   if (configLooksEmpty) {
     showConfigWarning();

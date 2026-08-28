@@ -17,6 +17,11 @@ export const state = {
   lastPembelianItems: [],
   distribusiSppgUnsub: null,
   lastDistribusiSppgItems: [],
+  poSppgUnsub: null,
+  lastPoSppgItems: [],
+  poPrefill: null, // PO yang sedang dibuatkan nota pengiriman — dibaca sekali oleh halaman Distribusi SPPG lalu dikosongkan
+  biayaOperasionalUnsub: null,
+  lastBiayaOperasionalItems: [],
   activityLogUnsub: null,
   lastActivityLog: [],
   authMode: 'login', // 'login' | 'register'

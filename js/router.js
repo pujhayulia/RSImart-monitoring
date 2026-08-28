@@ -19,8 +19,10 @@ export const MODULES = {
     label: 'Koperasi Bahan Makanan',
     pages: {
       beranda: 'Beranda Koperasi',
+      posppg: 'PO dari SPPG',
       pembelian: 'Pembelian Bahan Makanan',
       distribusisppg: 'Distribusi ke SPPG',
+      biayaoperasional: 'Biaya Operasional',
       laporankeuangan: 'Laporan Keuangan Koperasi',
     },
   },

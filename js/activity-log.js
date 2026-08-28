@@ -11,7 +11,7 @@ import { formatTimestamp, isTimestampInRange, escapeHtml } from './utils.js';
 const ACTION_LABEL = { tambah: 'Tambah', ubah: 'Ubah', hapus: 'Hapus' };
 
 /** Daftar modul yang benar-benar dipakai logActivity() di seluruh situs — dipakai untuk isi dropdown filter. */
-export const ACTIVITY_MODULES = ['Stok Gudang RSI', 'Distribusi', 'Koperasi - Pembelian', 'Koperasi - Distribusi SPPG'];
+export const ACTIVITY_MODULES = ['Stok Gudang RSI', 'Distribusi', 'Koperasi - PO SPPG', 'Koperasi - Pembelian', 'Koperasi - Distribusi SPPG', 'Koperasi - Biaya Operasional'];
 
 /** @param {{action:'tambah'|'ubah'|'hapus', modul:string, ringkasan:string}} entry */
 export async function logActivity(entry) {

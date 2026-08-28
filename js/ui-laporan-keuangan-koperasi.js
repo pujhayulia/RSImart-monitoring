@@ -4,7 +4,9 @@
 // supaya angkanya selalu konsisten di kedua tempat.
 import { state } from './state.js';
 import { formatRupiah, formatDate, formatTimestamp, timestampToLocalDateIso, isTimestampInRange, escapeHtml } from './utils.js';
-import { notaInRange, flattenItems } from './ui-distribusi-sppg.js';
+import { notaInRange, flattenItems, itemNilai, notaTotalNilai } from './ui-distribusi-sppg.js';
+import { computeMarginKotor } from './ui-po-sppg.js';
+import { biayaOperasionalInRange } from './ui-biaya-operasional.js';
 import { downloadCsv, dateRangeFileTag, dateRangeLabel } from './csv-export.js';
 import { printReport } from './print-report.js';
 
@@ -22,17 +24,20 @@ export function computeKoperasiKeuangan(dari, sampai) {
   pembelian.forEach(it => { totalPengeluaran += typeof it.harga === 'number' ? it.harga : 0; });
 
   let totalPemasukan = 0;
-  sppgItems.forEach(it => { if (typeof it.hargaJual === 'number') totalPemasukan += it.hargaJual; });
+  sppgItems.forEach(it => { totalPemasukan += itemNilai(it) || 0; });
+
+  const marginKotor = computeMarginKotor(dari, sampai);
+  const biayaOp = biayaOperasionalInRange(dari, sampai);
+  let totalBiayaOperasional = 0;
+  biayaOp.forEach(it => { totalBiayaOperasional += typeof it.jumlah === 'number' ? it.jumlah : 0; });
 
   return {
     pembelian, notaList, sppgItems,
     totalPengeluaran, totalPemasukan,
     saldo: totalPemasukan - totalPengeluaran,
+    marginKotor, biayaOp, totalBiayaOperasional,
+    profitReal: marginKotor - totalBiayaOperasional,
   };
-}
-
-function notaNilai(nota) {
-  return (nota.items || []).reduce((s, it) => s + (typeof it.hargaJual === 'number' ? it.hargaJual : 0), 0);
 }
 
 function buildLedger(data) {
@@ -52,7 +57,7 @@ function buildLedger(data) {
       tanggalDisplay: formatDate(nota.tanggalKirim) + (nota.jamKirim ? ', ' + nota.jamKirim : ''),
       keterangan: `Distribusi - Nota ke ${nota.tujuanSppg} (${(nota.items || []).length} jenis barang)`,
       jenis: 'Pemasukan',
-      jumlah: notaNilai(nota),
+      jumlah: notaTotalNilai(nota),
     });
   });
   ledger.sort((a, b) => (a.tanggalSort < b.tanggalSort ? 1 : a.tanggalSort > b.tanggalSort ? -1 : 0));
@@ -72,7 +77,7 @@ function buildBreakdownPemasukan(notaList) {
   const map = {};
   notaList.forEach(nota => {
     const key = nota.tujuanSppg || 'Lainnya';
-    map[key] = (map[key] || 0) + notaNilai(nota);
+    map[key] = (map[key] || 0) + notaTotalNilai(nota);
   });
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 }
@@ -102,6 +107,13 @@ export function renderRingkasanKeuanganKoperasi() {
   document.getElementById('kopKeuanganSaldo').textContent = formatRupiah(data.saldo);
   saldoCard.classList.toggle('danger', data.saldo < 0);
   saldoCard.classList.toggle('alt', data.saldo >= 0);
+
+  document.getElementById('kopMarginKotor').textContent = formatRupiah(data.marginKotor);
+  document.getElementById('kopBiayaOperasional').textContent = formatRupiah(data.totalBiayaOperasional);
+  const profitCard = document.getElementById('kopProfitRealCard');
+  document.getElementById('kopProfitReal').textContent = formatRupiah(data.profitReal);
+  profitCard.classList.toggle('danger', data.profitReal < 0);
+  profitCard.classList.toggle('alt', data.profitReal >= 0);
 }
 
 export function initRingkasanKeuanganKoperasiEvents() {
@@ -129,6 +141,13 @@ export function renderLaporanKeuanganKoperasi() {
   saldoCard.classList.toggle('danger', data.saldo < 0);
   saldoCard.classList.toggle('alt', data.saldo >= 0);
   document.getElementById('lkSaldoLabel').textContent = data.saldo >= 0 ? 'Laba Bersih' : 'Rugi Bersih';
+
+  document.getElementById('lkMarginKotor').textContent = formatRupiah(data.marginKotor);
+  document.getElementById('lkBiayaOperasional').textContent = formatRupiah(data.totalBiayaOperasional);
+  const profitCard = document.getElementById('lkProfitRealCard');
+  document.getElementById('lkProfitReal').textContent = formatRupiah(data.profitReal);
+  profitCard.classList.toggle('danger', data.profitReal < 0);
+  profitCard.classList.toggle('alt', data.profitReal >= 0);
 
   const ledger = buildLedger(data);
   document.getElementById('lkLedger').innerHTML = ledger.length === 0
@@ -163,6 +182,10 @@ export function downloadLaporanKeuanganCsv() {
   rows.push(['TOTAL PEMASUKAN', '', '', data.totalPemasukan]);
   rows.push(['TOTAL PENGELUARAN', '', '', data.totalPengeluaran]);
   rows.push([data.saldo >= 0 ? 'LABA BERSIH' : 'RUGI BERSIH', '', '', data.saldo]);
+  rows.push([]);
+  rows.push(['MARGIN KOTOR (PO)', '', '', data.marginKotor]);
+  rows.push(['BIAYA OPERASIONAL', '', '', data.totalBiayaOperasional]);
+  rows.push(['TOTAL PROFIT REAL', '', '', data.profitReal]);
 
   downloadCsv(`Laporan-Keuangan-Koperasi-${dateRangeFileTag(dari, sampai)}.csv`, headers, rows);
 }
@@ -182,6 +205,11 @@ export function downloadLaporanKeuanganPdf() {
       <div class="print-total-box"><div class="lbl">Total Pemasukan</div><div class="val">${formatRupiah(data.totalPemasukan)}</div></div>
       <div class="print-total-box"><div class="lbl">Total Pengeluaran</div><div class="val">${formatRupiah(data.totalPengeluaran)}</div></div>
       <div class="print-total-box"><div class="lbl">${saldoLabel}</div><div class="val">${formatRupiah(data.saldo)}</div></div>
+    </div>
+    <div class="print-totals">
+      <div class="print-total-box"><div class="lbl">Margin Kotor (PO)</div><div class="val">${formatRupiah(data.marginKotor)}</div></div>
+      <div class="print-total-box"><div class="lbl">Biaya Operasional</div><div class="val">${formatRupiah(data.totalBiayaOperasional)}</div></div>
+      <div class="print-total-box"><div class="lbl">Total Profit Real</div><div class="val">${formatRupiah(data.profitReal)}</div></div>
     </div>
     <h3>Rincian Transaksi</h3>
     <table>

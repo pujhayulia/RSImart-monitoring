@@ -174,8 +174,10 @@
 
       <nav class="sidebar-nav hidden" data-module="koperasi" aria-label="Navigasi Koperasi Bahan Makanan">
         <a href="#/koperasi/beranda" class="sidebar-link" data-module="koperasi" data-page="beranda"><span class="sidebar-link-icon">🏠</span>Beranda</a>
+        <a href="#/koperasi/posppg" class="sidebar-link" data-module="koperasi" data-page="posppg"><span class="sidebar-link-icon">📋</span>PO dari SPPG</a>
         <a href="#/koperasi/pembelian" class="sidebar-link" data-module="koperasi" data-page="pembelian"><span class="sidebar-link-icon">🛒</span>Pembelian Bahan Makanan</a>
         <a href="#/koperasi/distribusisppg" class="sidebar-link" data-module="koperasi" data-page="distribusisppg"><span class="sidebar-link-icon">🥬</span>Distribusi ke SPPG</a>
+        <a href="#/koperasi/biayaoperasional" class="sidebar-link" data-module="koperasi" data-page="biayaoperasional"><span class="sidebar-link-icon">🚛</span>Biaya Operasional</a>
         <a href="#/koperasi/laporankeuangan" class="sidebar-link" data-module="koperasi" data-page="laporankeuangan"><span class="sidebar-link-icon">📊</span>Laporan Keuangan Koperasi</a>
       </nav>
 
@@ -536,14 +538,43 @@
           </div>
 
           <div class="section-head section-head--sub">
+            <h3>Analisis Margin &amp; Profit</h3>
+            <p>Margin kotor dari selisih harga jual PO vs harga beli riil ke supplier, dikurangi biaya operasional.</p>
+          </div>
+          <div class="totals-row koperasi-totals koperasi-totals--3col">
+            <div class="total-card">
+              <div class="lbl">Margin Kotor</div>
+              <div class="val" id="kopMarginKotor">–</div>
+            </div>
+            <div class="total-card amber">
+              <div class="lbl">Biaya Operasional</div>
+              <div class="val" id="kopBiayaOperasional">–</div>
+            </div>
+            <div class="total-card alt" id="kopProfitRealCard">
+              <div class="lbl">Total Profit Real</div>
+              <div class="val" id="kopProfitReal">–</div>
+            </div>
+          </div>
+
+          <div class="section-head section-head--sub">
             <h3>Menu Cepat</h3>
             <p>Langsung ke fitur yang Anda butuhkan.</p>
           </div>
           <div class="quick-link-grid">
+            <a class="quick-link-card" href="#/koperasi/posppg">
+              <span class="quick-link-icon">📋</span>
+              <span class="quick-link-title">PO dari SPPG</span>
+              <span class="quick-link-desc">Kelola pesanan SPPG dari masuk sampai terkirim.</span>
+            </a>
             <a class="quick-link-card" href="#/koperasi/pembelian">
               <span class="quick-link-icon">🛒</span>
               <span class="quick-link-title">Pembelian Bahan Makanan</span>
               <span class="quick-link-desc">Catat pembelian dari toko/supplier.</span>
+            </a>
+            <a class="quick-link-card" href="#/koperasi/biayaoperasional">
+              <span class="quick-link-icon">🚛</span>
+              <span class="quick-link-title">Biaya Operasional</span>
+              <span class="quick-link-desc">Catat biaya di luar pembelian barang.</span>
             </a>
             <a class="quick-link-card" href="#/koperasi/distribusisppg">
               <span class="quick-link-icon">🥬</span>
@@ -562,6 +593,75 @@
           <option value="kg"><option value="gram"><option value="liter"><option value="pcs">
           <option value="ikat"><option value="papan"><option value="dus"><option value="karung">
         </datalist>
+
+        <!-- PO DARI SPPG -->
+        <section class="page" data-module="koperasi" data-page="posppg" id="page-koperasi-posppg">
+          <div class="section-head">
+            <div class="eyebrow">Koperasi Yayasan</div>
+            <h2>PO dari SPPG</h2>
+            <p>Alur pesanan: SPPG memesan (PO) &rarr; koperasi membeli ke supplier &rarr; konfirmasi harga ke SPPG &rarr; disetujui &amp; dikirim &rarr; cetak Invoice/Berita Acara.</p>
+          </div>
+
+          <div class="totals-row koperasi-totals">
+            <div class="total-card">
+              <div class="lbl">PO Menunggu Tindakan</div>
+              <div class="val" id="poMenungguTindakan">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">PO Aktif (Belum Terkirim)</div>
+              <div class="val" id="poAktifCount">–</div>
+            </div>
+          </div>
+
+          <div class="shared-note po-import-bar hidden" id="poImportBar">
+            <span>📦 Ada arsip PO lama (Maret–Agustus 2026) dari file Excel koperasi yang belum dimasukkan ke sistem.</span>
+            <button type="button" class="btn-ghost" id="btnImportArsipPo">Import Arsip Sekarang</button>
+          </div>
+
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Catat PO Baru dari SPPG</h3>
+              <p class="tip">Harga di sini adalah harga per satuan (bukan total), bersifat rencana — akan dikonfirmasi ulang setelah barang dibeli.</p>
+              <div class="dist-field">
+                <label for="poTanggal">Tanggal PO</label>
+                <input type="date" id="poTanggal">
+              </div>
+              <div class="dist-field">
+                <label for="poTujuan">Tujuan / Nama SPPG</label>
+                <input id="poTujuan" list="lokasiList" placeholder="Nama SPPG pemesan">
+              </div>
+              <div class="dist-field">
+                <label for="poCatatan">Catatan (opsional)</label>
+                <textarea id="poCatatan" rows="2" placeholder="Catatan tambahan"></textarea>
+              </div>
+              <div class="dist-field">
+                <label>Barang yang Dipesan</label>
+                <div class="nota-item-rows" id="poItemRows"></div>
+                <button type="button" class="btn-ghost nota-add-btn" id="btnTambahBarangPo">+ Tambah Barang</button>
+              </div>
+              <button type="button" class="btn btn--block" id="btnSavePo">Simpan PO</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditPo">Batal Edit</button>
+              <div class="shared-note">PO baru berstatus "Menunggu Pembelian". Harga rencana boleh dikosongkan.</div>
+            </div>
+            <div>
+              <div class="date-filter-row activity-filter-row">
+                <select id="poFilterStatus" aria-label="Filter status">
+                  <option value="all">Semua Status</option>
+                  <option value="menunggu_pembelian">Menunggu Pembelian</option>
+                  <option value="menunggu_persetujuan">Menunggu Persetujuan SPPG</option>
+                  <option value="disetujui">Disetujui — Siap Kirim</option>
+                  <option value="ditolak">Ditolak</option>
+                  <option value="terkirim">Terkirim</option>
+                </select>
+                <input type="date" id="poFilterDari" aria-label="Dari tanggal">
+                <input type="date" id="poFilterSampai" aria-label="Sampai tanggal">
+                <button type="button" class="filter-reset" id="btnPoFilterReset">Reset</button>
+                <button type="button" class="btn-ghost download-btn" id="btnDownloadPo">⬇ Download (CSV)</button>
+              </div>
+              <div class="po-list" id="poSppgLog"></div>
+            </div>
+          </div>
+        </section>
 
         <!-- PEMBELIAN BAHAN MAKANAN -->
         <section class="page" data-module="koperasi" data-page="pembelian" id="page-koperasi-pembelian">
@@ -586,6 +686,18 @@
             <div class="dist-form">
               <h3>Catat Pembelian Baru</h3>
               <p class="tip">Tanggal &amp; jam tersimpan otomatis saat data disimpan.</p>
+              <div class="dist-field">
+                <label for="pembelianPoId">Kaitkan ke PO (opsional)</label>
+                <select id="pembelianPoId">
+                  <option value="">— Tidak dikaitkan ke PO —</option>
+                </select>
+              </div>
+              <div class="dist-field">
+                <label for="pembelianPoItem">Barang di PO</label>
+                <select id="pembelianPoItem" disabled>
+                  <option value="">—</option>
+                </select>
+              </div>
               <div class="dist-field">
                 <label for="pembelianNamaToko">Nama Toko</label>
                 <input id="pembelianNamaToko" placeholder="Mis. Toko Sumber Rejeki">
@@ -701,6 +813,69 @@
           </div>
         </section>
 
+        <!-- BIAYA OPERASIONAL -->
+        <section class="page" data-module="koperasi" data-page="biayaoperasional" id="page-koperasi-biayaoperasional">
+          <div class="section-head">
+            <div class="eyebrow">Koperasi Yayasan</div>
+            <h2>Biaya Operasional</h2>
+            <p>Pengeluaran di luar pembelian barang (mis. e-toll, ongkos kirim/lalamove, dsb) — ikut mengurangi Total Profit di Laporan Keuangan Koperasi.</p>
+          </div>
+
+          <div class="totals-row koperasi-totals">
+            <div class="total-card amber">
+              <div class="lbl">Total Biaya (Difilter)</div>
+              <div class="val" id="biayaOpTotal">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Jumlah Catatan (Difilter)</div>
+              <div class="val" id="biayaOpTotalTransaksi">–</div>
+            </div>
+          </div>
+
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Catat Biaya Baru</h3>
+              <p class="tip">Tanggal &amp; jam tersimpan otomatis saat data disimpan.</p>
+              <div class="dist-field">
+                <label for="biayaOpTanggal">Tanggal</label>
+                <input type="date" id="biayaOpTanggal">
+              </div>
+              <div class="dist-field">
+                <label for="biayaOpLokasi">Dapur / Lokasi</label>
+                <input id="biayaOpLokasi" list="lokasiList" placeholder="Mis. Dapur SPPG Sudimara Jaya">
+              </div>
+              <div class="dist-field">
+                <label for="biayaOpKategori">Kategori</label>
+                <select id="biayaOpKategori">
+                  <option value="koperasi">Operasional Koperasi</option>
+                  <option value="dapur">Operasional Dapur</option>
+                </select>
+              </div>
+              <div class="dist-field">
+                <label for="biayaOpKeterangan">Keterangan</label>
+                <input id="biayaOpKeterangan" placeholder="Mis. E-Toll, Lalamove Ayam">
+              </div>
+              <div class="dist-field">
+                <label for="biayaOpJumlah">Jumlah (Rp)</label>
+                <input type="number" id="biayaOpJumlah" placeholder="0">
+              </div>
+              <button type="button" class="btn btn--block" id="btnSaveBiayaOp">Simpan Biaya</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditBiayaOp">Batal Edit</button>
+              <div class="shared-note">Data ini ikut dihitung sebagai pengurang Total Profit Real di Laporan Keuangan Koperasi.</div>
+            </div>
+            <div>
+              <div class="date-filter-row">
+                <input type="date" id="biayaOpFilterDari" aria-label="Dari tanggal">
+                <span class="date-filter-sep">–</span>
+                <input type="date" id="biayaOpFilterSampai" aria-label="Sampai tanggal">
+                <button type="button" class="filter-reset" id="btnBiayaOpFilterReset">Reset</button>
+                <button type="button" class="btn-ghost download-btn" id="btnDownloadBiayaOp">⬇ Download (CSV)</button>
+              </div>
+              <div class="dist-log" id="biayaOpLog"></div>
+            </div>
+          </div>
+        </section>
+
         <!-- LAPORAN KEUANGAN KOPERASI -->
         <section class="page" data-module="koperasi" data-page="laporankeuangan" id="page-koperasi-laporankeuangan">
           <div class="section-head">
@@ -728,6 +903,25 @@
             <div class="total-card alt" id="lkSaldoCard">
               <div class="lbl" id="lkSaldoLabel">Laba/Rugi Bersih</div>
               <div class="val" id="lkSaldo">–</div>
+            </div>
+          </div>
+
+          <div class="section-head section-head--sub">
+            <h3>Analisis Margin &amp; Profit</h3>
+            <p>Margin kotor dari selisih harga jual PO vs harga beli riil ke supplier, dikurangi biaya operasional.</p>
+          </div>
+          <div class="totals-row koperasi-totals koperasi-totals--3col">
+            <div class="total-card">
+              <div class="lbl">Margin Kotor</div>
+              <div class="val" id="lkMarginKotor">–</div>
+            </div>
+            <div class="total-card amber">
+              <div class="lbl">Biaya Operasional</div>
+              <div class="val" id="lkBiayaOperasional">–</div>
+            </div>
+            <div class="total-card alt" id="lkProfitRealCard">
+              <div class="lbl">Total Profit Real</div>
+              <div class="val" id="lkProfitReal">–</div>
             </div>
           </div>
 
@@ -805,6 +999,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=10"></script>
+<script type="module" src="js/main.js?v=13"></script>
 </body>
 </html>

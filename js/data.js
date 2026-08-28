@@ -17,6 +17,18 @@ export const ICONS = {
 
 export const SEED_LOKASI = ['Dapur Nambo', 'Dapur Meruya', 'Sudimara/Ciledug', 'BTN', 'Depnaker', 'Rumah Pak Abay'];
 
+/** Kop surat & info rekening Koperasi — dipakai untuk cetak Invoice/Berita Acara ke SPPG. */
+export const KOPERASI_INFO = {
+  nama: 'Koperasi Niaga Indonesia Sejahtera',
+  namaSingkat: 'Koperasi NIS',
+  alamatBaris: ['Jl. Hos Cokroaminoto No 11', 'RT.001/RW.07, Sudimara Jaya.', 'Kec. Ciledug, Kota Tangerang, Banten 15151'],
+  alamat: 'Jl. Hos Cokroaminoto No 11, RT.001/RW.07, Sudimara Jaya, Kec. Ciledug, Kota Tangerang, Banten 15151',
+  bankNama: 'BTN',
+  bankRekening: '43.01.88.000934.7',
+  bankAtasNama: 'Koperasi Konsumen Niaga Indonesia Sejahtera',
+  penandaTangan: 'Muh.Ghufron',
+};
+
 export const SEED_DATE = '2026-07-16';
 export const SEED_GUDANG = { isi: 133, kosong: 387, peredaran: 520, stokProduk: {} };
 

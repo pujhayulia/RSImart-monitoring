@@ -6,12 +6,14 @@ import {
   collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
-import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
+import { markPoTerkirim } from './ui-po-sppg.js';
 
 let rowCounter = 0;
 let editingId = null;
+let linkedPoId = null; // id PO (poSppg) yang sedang dibuatkan nota ini, kalau datang dari alur "Buat Nota Pengiriman"
 
 function itemRowHtml(rowId) {
   return `
@@ -20,7 +22,7 @@ function itemRowHtml(rowId) {
       <div class="nota-item-row-sub">
         <input class="nir-jumlah" type="number" placeholder="Jumlah">
         <input class="nir-satuan" list="satuanList" placeholder="Satuan">
-        <input class="nir-harga" type="number" placeholder="Harga jual (opsional)">
+        <input class="nir-harga" type="number" placeholder="Harga satuan jual (opsional)">
         <button type="button" class="nir-remove" data-rowid="${rowId}" title="Hapus baris ini">✕</button>
       </div>
     </div>`;
@@ -109,16 +111,24 @@ export function flattenItems(notaList) {
   return flat;
 }
 
+/** Nilai satu baris barang (harga satuan x jumlah) — null kalau harga belum diisi. Diekspor untuk dipakai ulang oleh Laporan Keuangan Koperasi. */
+export function itemNilai(it) {
+  if (typeof it.hargaJual !== 'number') return null;
+  const jumlah = typeof it.jumlah === 'number' ? it.jumlah : 0;
+  return it.hargaJual * jumlah;
+}
+
 /** Total nilai & jumlah barang dari SELURUH nota yang sudah termuat (tanpa filter tanggal) — dipakai di Beranda Koperasi. */
 export function computeDistribusiSppgSummary() {
   const items = flattenItems(state.lastDistribusiSppgItems);
   let totalNilai = 0;
-  items.forEach(it => { if (typeof it.hargaJual === 'number') totalNilai += it.hargaJual; });
+  items.forEach(it => { totalNilai += itemNilai(it) || 0; });
   return { totalNilai, jumlahItem: items.length };
 }
 
-function notaTotalNilai(nota) {
-  return (nota.items || []).reduce((sum, it) => sum + (typeof it.hargaJual === 'number' ? it.hargaJual : 0), 0);
+/** Total nilai satu nota (jumlah semua baris barang x harga satuannya). Diekspor untuk dipakai ulang oleh Laporan Keuangan Koperasi. */
+export function notaTotalNilai(nota) {
+  return (nota.items || []).reduce((sum, it) => sum + (itemNilai(it) || 0), 0);
 }
 
 export function renderDistribusiSppg() {
@@ -127,7 +137,7 @@ export function renderDistribusiSppg() {
   const items = flattenItems(notaList);
 
   let totalNilai = 0;
-  items.forEach(it => { if (typeof it.hargaJual === 'number') totalNilai += it.hargaJual; });
+  items.forEach(it => { totalNilai += itemNilai(it) || 0; });
   const totalNilaiEl = document.getElementById('sppgTotalNilai');
   const totalItemEl = document.getElementById('sppgTotalItem');
   if (totalNilaiEl) totalNilaiEl.textContent = formatRupiah(totalNilai);
@@ -159,13 +169,17 @@ export function renderDistribusiSppg() {
       </div>
     </div>
     <div class="nota-detail hidden" id="notaDetail-${nota.id}">
-      ${(nota.items || []).map(it => `
+      ${(nota.items || []).map(it => {
+        const nilai = itemNilai(it);
+        const title = typeof it.hargaJual === 'number' ? `@ ${formatRupiah(it.hargaJual)} / ${escapeHtml(it.satuan || 'satuan')}` : '';
+        return `
         <div class="nota-detail-row">
           <span class="nota-detail-nama">${escapeHtml(it.namaBarang)}</span>
           <span class="nota-detail-qty">${it.jumlah ?? '-'} ${escapeHtml(it.satuan || '')}</span>
-          <span class="nota-detail-harga">${typeof it.hargaJual === 'number' ? formatRupiah(it.hargaJual) : '-'}</span>
+          <span class="nota-detail-harga" title="${title}">${nilai !== null ? formatRupiah(nilai) : '-'}</span>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>`;
   }).join('');
 
@@ -210,11 +224,38 @@ function startEditSppg(nota) {
 
 function cancelEditSppg() {
   editingId = null;
+  linkedPoId = null;
   document.getElementById('sppgTujuan').value = '';
   document.getElementById('sppgCatatan').value = '';
   resetItemRows();
   document.getElementById('btnSaveSppg').textContent = 'Simpan Nota Pengiriman';
   document.getElementById('btnCancelEditSppg').classList.add('hidden');
+}
+
+/** Dipanggil dari ui-po-sppg.js ("Buat Nota Pengiriman →") — isi form dari PO yang sudah disetujui SPPG. */
+export function prefillFromPo(po) {
+  editingId = null;
+  linkedPoId = po.id;
+  document.getElementById('sppgTanggalKirim').value = todayIso();
+  document.getElementById('sppgJamKirim').value = '';
+  document.getElementById('sppgTujuan').value = po.tujuanSppg || '';
+  document.getElementById('sppgCatatan').value = `Dari PO ${formatDate(po.tanggalPo)}${po.catatan ? ' — ' + po.catatan : ''}`;
+
+  document.getElementById('sppgItemRows').innerHTML = '';
+  rowCounter = 0;
+  const items = po.items || [];
+  if (items.length === 0) {
+    addItemRow();
+  } else {
+    items.forEach(item => addItemRow({
+      namaBarang: item.namaBarang, jumlah: item.jumlah, satuan: item.satuan,
+      hargaJual: typeof item.hargaFinal === 'number' ? item.hargaFinal : item.hargaRencana,
+    }));
+  }
+
+  document.getElementById('btnSaveSppg').textContent = `Simpan Nota Pengiriman (dari PO ${po.tujuanSppg})`;
+  document.getElementById('btnCancelEditSppg').classList.remove('hidden');
+  document.getElementById('sppgTujuan').closest('.dist-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function deleteDistribusiSppg(id) {
@@ -274,15 +315,22 @@ export async function saveDistribusiSppg() {
       });
       cancelEditSppg();
     } else {
-      await addDoc(collection(state.db, 'distribusiSppg'), entry);
+      if (linkedPoId) entry.poId = linkedPoId;
+      const ref = await addDoc(collection(state.db, 'distribusiSppg'), entry);
       logActivity({
         action: 'tambah',
         modul: 'Koperasi - Distribusi SPPG',
         ringkasan: `Nota distribusi ke ${tujuanSppg} (${items.length} jenis barang)`,
       });
+      if (linkedPoId) {
+        await markPoTerkirim(linkedPoId, ref.id);
+        linkedPoId = null;
+      }
       document.getElementById('sppgTujuan').value = '';
       document.getElementById('sppgCatatan').value = '';
       resetItemRows();
+      document.getElementById('btnSaveSppg').textContent = 'Simpan Nota Pengiriman';
+      document.getElementById('btnCancelEditSppg').classList.add('hidden');
     }
   } catch (e) {
     console.error(e);
@@ -302,21 +350,21 @@ export function downloadLaporanDistribusiSppg() {
     return;
   }
 
-  const headers = ['Tanggal Kirim', 'Jam Kirim', 'Tujuan SPPG', 'Catatan Nota', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga Jual (Rp)', 'Diinput Oleh', 'Dicatat Pada'];
+  const headers = ['Tanggal Kirim', 'Jam Kirim', 'Tujuan SPPG', 'Catatan Nota', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga Satuan Jual (Rp)', 'Subtotal (Rp)', 'Diinput Oleh', 'Dicatat Pada'];
   const rows = [];
   notaList.forEach(nota => {
     (nota.items || []).forEach(item => {
       rows.push([
         formatDate(nota.tanggalKirim), nota.jamKirim || '', nota.tujuanSppg, nota.catatan || '',
-        item.namaBarang, item.jumlah ?? '', item.satuan || '', item.hargaJual ?? '',
+        item.namaBarang, item.jumlah ?? '', item.satuan || '', item.hargaJual ?? '', itemNilai(item) ?? '',
         nota.createdBy || '', formatTimestamp(nota.createdAt),
       ]);
     });
   });
 
-  const totalNilai = flattenItems(notaList).reduce((s, it) => s + (typeof it.hargaJual === 'number' ? it.hargaJual : 0), 0);
+  const totalNilai = flattenItems(notaList).reduce((s, it) => s + (itemNilai(it) || 0), 0);
   rows.push([]);
-  rows.push(['TOTAL NILAI DISTRIBUSI', '', '', '', '', '', '', totalNilai]);
+  rows.push(['TOTAL NILAI DISTRIBUSI', '', '', '', '', '', '', '', totalNilai]);
 
   downloadCsv(`Laporan-Distribusi-SPPG-${dateRangeFileTag(dari, sampai)}.csv`, headers, rows);
 }

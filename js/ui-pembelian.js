@@ -5,13 +5,73 @@ import {
   collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
-import { formatRupiah, formatTimestamp, isTimestampInRange, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, formatTimestamp, isTimestampInRange, escapeHtml } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
 const FIELD_IDS = ['NamaToko', 'NoHp', 'AlamatToko', 'NamaPembeli', 'NamaBarang', 'Jumlah', 'Satuan', 'Harga', 'Catatan'];
 
 let editingId = null;
+
+/** Kunci stabil satu baris barang PO (sama dengan poItemKey() di ui-po-sppg.js, sengaja tidak diimpor supaya kedua modul tidak saling bergantung). */
+function poItemKeyLocal(item, index) {
+  return item.itemId || ('idx' + index);
+}
+
+/** Total sudah dibeli untuk satu barang PO tertentu (opsional: kecualikan satu catatan pembelian, mis. saat sedang diedit). */
+function jumlahDibeliUntukPoItem(poId, itemId, excludeId) {
+  return (state.lastPembelianItems || [])
+    .filter(it => it.poId === poId && it.poItemId === itemId && it.id !== excludeId)
+    .reduce((sum, it) => sum + (typeof it.jumlah === 'number' ? it.jumlah : 0), 0);
+}
+
+/** Isi ulang dropdown "Kaitkan ke PO" dari PO yang masih berstatus Menunggu Pembelian. */
+export function refreshPoOptions() {
+  const sel = document.getElementById('pembelianPoId');
+  if (!sel) return;
+  const current = sel.value;
+  const open = (state.lastPoSppgItems || []).filter(po => po.status === 'menunggu_pembelian');
+  sel.innerHTML = '<option value="">— Tidak dikaitkan ke PO —</option>' +
+    open.map(po => `<option value="${po.id}">${escapeHtml(po.tujuanSppg)} — ${formatDate(po.tanggalPo)}</option>`).join('');
+  sel.value = open.some(po => po.id === current) ? current : '';
+  populatePoItemSelect();
+}
+
+function populatePoItemSelect() {
+  const poSel = document.getElementById('pembelianPoId');
+  const itemSel = document.getElementById('pembelianPoItem');
+  if (!poSel || !itemSel) return;
+  const current = itemSel.value;
+  const po = (state.lastPoSppgItems || []).find(p => p.id === poSel.value);
+  if (!po) {
+    itemSel.innerHTML = '<option value="">—</option>';
+    itemSel.disabled = true;
+    return;
+  }
+  itemSel.disabled = false;
+  const items = po.items || [];
+  itemSel.innerHTML = items.map((it, idx) => {
+    const key = poItemKeyLocal(it, idx);
+    const jumlahOrder = typeof it.jumlah === 'number' ? it.jumlah : 0;
+    const dibeli = jumlahDibeliUntukPoItem(po.id, key, editingId);
+    const sisa = jumlahOrder - dibeli;
+    const label = `${it.namaBarang} — ${jumlahOrder} ${it.satuan || ''} dipesan${dibeli > 0 ? `, sisa ${sisa}` : ''}`;
+    return `<option value="${key}">${escapeHtml(label)}</option>`;
+  }).join('');
+  if (items.some((it, idx) => poItemKeyLocal(it, idx) === current)) itemSel.value = current;
+}
+
+function applyPoItemToForm() {
+  const poSel = document.getElementById('pembelianPoId');
+  const itemSel = document.getElementById('pembelianPoItem');
+  const po = (state.lastPoSppgItems || []).find(p => p.id === poSel.value);
+  if (!po) return;
+  const idx = (po.items || []).findIndex((it, i) => poItemKeyLocal(it, i) === itemSel.value);
+  if (idx === -1) return;
+  const it = po.items[idx];
+  fieldEl('NamaBarang').value = it.namaBarang || '';
+  fieldEl('Satuan').value = it.satuan || '';
+}
 
 function fieldEl(name) {
   return document.getElementById('pembelian' + name);
@@ -63,7 +123,9 @@ export function renderPembelian() {
     return;
   }
 
-  logEl.innerHTML = items.map(it => `
+  logEl.innerHTML = items.map(it => {
+    const linkedPo = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
+    return `
     <div class="dist-item">
       <div class="left">
         <b>${escapeHtml(it.namaBarang)}</b>
@@ -72,6 +134,7 @@ export function renderPembelian() {
         <div class="meta">Dibeli oleh ${escapeHtml(it.namaPembeli)} · ${formatTimestamp(it.createdAt)}</div>
         ${it.catatan ? `<div class="meta">Catatan: ${escapeHtml(it.catatan)}</div>` : ''}
         ${it.createdBy ? `<div class="meta">Diinput oleh ${escapeHtml(it.createdBy)}</div>` : ''}
+        ${linkedPo ? `<div class="meta">🔗 Untuk PO: ${escapeHtml(linkedPo.tujuanSppg)} (${formatDate(linkedPo.tanggalPo)})</div>` : ''}
       </div>
       <div class="right">
         <div class="qty">${it.jumlah} ${escapeHtml(it.satuan)}</div>
@@ -82,7 +145,8 @@ export function renderPembelian() {
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   logEl.querySelectorAll('button.del-btn').forEach(btn => {
     btn.addEventListener('click', () => deletePembelian(btn.dataset.delid));
@@ -107,6 +171,10 @@ function startEditPembelian(item) {
   fieldEl('Harga').value = item.harga ?? '';
   fieldEl('Catatan').value = item.catatan || '';
 
+  document.getElementById('pembelianPoId').value = item.poId || '';
+  populatePoItemSelect();
+  document.getElementById('pembelianPoItem').value = item.poItemId || '';
+
   document.getElementById('btnSavePembelian').textContent = 'Update Pembelian';
   document.getElementById('btnCancelEditPembelian').classList.remove('hidden');
   fieldEl('NamaToko').closest('.dist-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -115,6 +183,8 @@ function startEditPembelian(item) {
 function cancelEditPembelian() {
   editingId = null;
   for (const name of FIELD_IDS) fieldEl(name).value = '';
+  document.getElementById('pembelianPoId').value = '';
+  populatePoItemSelect();
   document.getElementById('btnSavePembelian').textContent = 'Simpan Pembelian';
   document.getElementById('btnCancelEditPembelian').classList.add('hidden');
 }
@@ -147,6 +217,9 @@ export async function savePembelian() {
     return;
   }
 
+  const poId = document.getElementById('pembelianPoId').value || null;
+  const poItemId = poId ? (document.getElementById('pembelianPoItem').value || null) : null;
+
   const entry = {
     namaToko: values.NamaToko,
     noHpToko: values.NoHp,
@@ -157,6 +230,7 @@ export async function savePembelian() {
     satuan: values.Satuan,
     harga: Number(values.Harga),
     catatan: values.Catatan,
+    poId, poItemId,
   };
   const isEdit = !!editingId;
   if (isEdit) {
@@ -186,6 +260,8 @@ export async function savePembelian() {
         ringkasan: `Beli ${entry.jumlah} ${entry.satuan} ${entry.namaBarang} dari ${entry.namaToko} (${formatRupiah(entry.harga)})`,
       });
       for (const name of FIELD_IDS) fieldEl(name).value = '';
+      document.getElementById('pembelianPoId').value = '';
+      populatePoItemSelect();
     }
   } catch (e) {
     console.error(e);
@@ -205,11 +281,16 @@ export function downloadLaporanPembelian() {
     return;
   }
 
-  const headers = ['Tanggal & Jam', 'Nama Toko', 'No. HP Toko', 'Alamat Toko', 'Nama Pembeli', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga (Rp)', 'Catatan', 'Diinput Oleh'];
-  const rows = items.map(it => [
-    formatTimestamp(it.createdAt), it.namaToko, it.noHpToko || '', it.alamatToko || '',
-    it.namaPembeli, it.namaBarang, it.jumlah, it.satuan, it.harga, it.catatan || '', it.createdBy || '',
-  ]);
+  const headers = ['Tanggal & Jam', 'Nama Toko', 'No. HP Toko', 'Alamat Toko', 'Nama Pembeli', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga (Rp)', 'Untuk PO', 'Catatan', 'Diinput Oleh'];
+  const rows = items.map(it => {
+    const linkedPo = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
+    return [
+      formatTimestamp(it.createdAt), it.namaToko, it.noHpToko || '', it.alamatToko || '',
+      it.namaPembeli, it.namaBarang, it.jumlah, it.satuan, it.harga,
+      linkedPo ? `${linkedPo.tujuanSppg} (${formatDate(linkedPo.tanggalPo)})` : '',
+      it.catatan || '', it.createdBy || '',
+    ];
+  });
 
   let total = 0;
   items.forEach(it => { total += typeof it.harga === 'number' ? it.harga : 0; });
@@ -230,4 +311,7 @@ export function initPembelianEvents() {
   });
   document.getElementById('btnDownloadPembelian').addEventListener('click', downloadLaporanPembelian);
   document.getElementById('btnCancelEditPembelian').addEventListener('click', cancelEditPembelian);
+  document.getElementById('pembelianPoId').addEventListener('change', populatePoItemSelect);
+  document.getElementById('pembelianPoItem').addEventListener('change', applyPoItemToForm);
+  refreshPoOptions();
 }
