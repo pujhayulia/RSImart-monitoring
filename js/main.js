@@ -21,6 +21,7 @@ import { watchPembelian, initPembelianEvents, refreshPoOptions } from './ui-pemb
 import { watchDistribusiSppg, initDistribusiSppgEvents, prefillFromPo } from './ui-distribusi-sppg.js';
 import { watchPoSppg, initPoSppgEvents } from './ui-po-sppg.js';
 import { watchBiayaOperasional, initBiayaOperasionalEvents } from './ui-biaya-operasional.js';
+import { initBackupEvents } from './ui-backup.js';
 import { renderBerandaKoperasi, initBerandaKoperasiEvents } from './ui-beranda-koperasi.js';
 import {
   computeKoperasiKeuangan, renderLaporanKeuanganKoperasi, initLaporanKeuanganKoperasiEvents
@@ -83,6 +84,7 @@ function initEvents() {
   initBerandaKoperasiEvents();
   initLaporanKeuanganKoperasiEvents();
   initActivityLogEvents();
+  initBackupEvents();
 }
 
 function onGudangChange() {

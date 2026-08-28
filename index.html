@@ -493,6 +493,12 @@
             <p>Ringkasan pembelian bahan makanan dan distribusi ke SPPG — terpisah dari Web RSI, untuk laporan biaya ke kepala yayasan.</p>
           </div>
 
+          <div class="section-head section-head--sub" style="margin-top:0;">
+            <h3>Perlu Tindakan</h3>
+            <p>PO dari SPPG yang masih butuh langkah berikutnya — klik untuk membuka.</p>
+          </div>
+          <div class="action-needed-row" id="berandaKopActionRow"></div>
+
           <div class="totals-row">
             <div class="total-card">
               <div class="lbl">Total Pengeluaran Pembelian</div>
@@ -593,6 +599,7 @@
           <option value="kg"><option value="gram"><option value="liter"><option value="pcs">
           <option value="ikat"><option value="papan"><option value="dus"><option value="karung">
         </datalist>
+        <datalist id="tokoList"></datalist>
 
         <!-- PO DARI SPPG -->
         <section class="page" data-module="koperasi" data-page="posppg" id="page-koperasi-posppg">
@@ -700,7 +707,7 @@
               </div>
               <div class="dist-field">
                 <label for="pembelianNamaToko">Nama Toko</label>
-                <input id="pembelianNamaToko" placeholder="Mis. Toko Sumber Rejeki">
+                <input id="pembelianNamaToko" list="tokoList" placeholder="Mis. Toko Sumber Rejeki">
               </div>
               <div class="dist-field">
                 <label for="pembelianNoHp">No. HP Toko</label>
@@ -976,6 +983,13 @@
             <h2>Riwayat Aktivitas</h2>
             <p>Catatan siapa menambah, mengubah, atau menghapus data — di seluruh situs, termasuk data yang sudah dihapus.</p>
           </div>
+          <div class="backup-box">
+            <div>
+              <b>Backup Semua Data</b>
+              <p>Unduh seluruh data situs (Stok Gudang, Distribusi, PO, Pembelian, Biaya Operasional, Riwayat Aktivitas, dst) jadi satu file JSON, untuk jaga-jaga.</p>
+            </div>
+            <button type="button" class="btn-ghost" id="btnDownloadBackup">⬇ Download Backup Semua Data (JSON)</button>
+          </div>
           <div class="date-filter-row activity-filter-row">
             <select id="aktivitasFilterModul" aria-label="Filter modul"></select>
             <select id="aktivitasFilterAksi" aria-label="Filter aksi">
@@ -999,6 +1013,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=13"></script>
+<script type="module" src="js/main.js?v=14"></script>
 </body>
 </html>

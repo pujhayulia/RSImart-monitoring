@@ -107,7 +107,25 @@ export function computePembelianSummary() {
   return { totalBelanja, jumlahTransaksi: state.lastPembelianItems.length };
 }
 
+/** Isi ulang datalist "Nama Toko" dari nama-nama toko unik yang pernah dipakai — tanpa collection Firestore terpisah. */
+function refreshTokoOptions() {
+  const list = document.getElementById('tokoList');
+  if (!list) return;
+  const seen = new Set();
+  const names = [];
+  state.lastPembelianItems.forEach(it => {
+    const nama = (it.namaToko || '').trim();
+    if (nama && !seen.has(nama.toLowerCase())) {
+      seen.add(nama.toLowerCase());
+      names.push(nama);
+    }
+  });
+  names.sort((a, b) => a.localeCompare(b));
+  list.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
+}
+
 export function renderPembelian() {
+  refreshTokoOptions();
   const logEl = document.getElementById('pembelianLog');
   const items = filteredPembelian();
 

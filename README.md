@@ -252,7 +252,17 @@ melihat data yang sama secara real-time.
   perubahan), termasuk jejak data yang sudah dihapus. Bisa diakses dari
   sidebar modul mana pun. Halaman ini punya filter (modul, jenis aksi,
   pencarian email, rentang tanggal) supaya tetap gampang ditelusuri walau
-  datanya makin banyak.
+  datanya makin banyak. Di halaman yang sama ada tombol **"Download Backup
+  Semua Data (JSON)"** — mengambil langsung dari Firestore (bukan cache),
+  jadi hasilnya selalu lengkap tanpa batas jumlah seperti yang dipakai
+  masing-masing halaman.
+- **Perlu Tindakan**: di Beranda Koperasi, ada ringkasan jumlah PO yang masih
+  "Menunggu Pembelian" / "Menunggu Persetujuan SPPG" / "Disetujui — Siap
+  Kirim" — klik salah satu langsung ke halaman PO dari SPPG.
+- **Nama Toko otomatis**: field "Nama Toko" di Pembelian punya saran
+  auto-lengkap dari nama toko yang pernah dipakai sebelumnya (tanpa
+  collection Firestore terpisah — cukup diambil dari riwayat Pembelian),
+  supaya "Toko A" tidak tercatat beda-beda karena salah ketik.
 - **Edit data**: baris di Pengiriman RSI, Pembelian, dan Distribusi SPPG bisa
   diklik ikon ✏️ untuk mengisi ulang form dengan data yang sudah ada (untuk
   nota SPPG, semua baris barangnya ikut dimuat ulang) — tinggal ubah lalu
