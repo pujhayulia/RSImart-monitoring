@@ -94,17 +94,23 @@ export function watchPembelian(onChange) {
 }
 
 /**
- * Tanggal efektif satu pembelian: tanggal PO yang ditautkan, kalau ada — supaya pembelian
- * yang tanggal transaksi aslinya beda dari saat diinput (mis. arsip LPJ yang diimpor
- * belakangan) tetap kefilter di tanggal transaksi yang benar. Kalau tidak ditautkan ke PO,
- * pakai createdAt (waktu catatan ini disimpan).
+ * Tanggal efektif satu pembelian: untuk catatan hasil impor arsip (importBatch terisi),
+ * pakai tanggal PO yang ditautkan — createdAt-nya cuma waktu import, bukan tanggal
+ * transaksi asli. Pembelian biasa (input manual sehari-hari) tetap pakai createdAt,
+ * karena itu memang waktu transaksinya yang sebenarnya (bisa beda dari tanggalPo).
  */
 export function pembelianTanggalIso(it) {
-  if (it.poId) {
+  if (it.importBatch && it.poId) {
     const po = (state.lastPoSppgItems || []).find(p => p.id === it.poId);
     if (po && po.tanggalPo) return po.tanggalPo;
   }
   return timestampToLocalDateIso(it.createdAt);
+}
+
+/** Versi tampilan (untuk UI/CSV): tanggal arsip ditampilkan tanpa jam (jamnya tidak relevan), pembelian biasa tetap dengan jam. */
+export function pembelianTanggalDisplay(it) {
+  if (it.importBatch) return formatDate(pembelianTanggalIso(it));
+  return formatTimestamp(it.createdAt);
 }
 
 function filteredPembelian() {
@@ -163,7 +169,7 @@ export function renderPembelian() {
         <b>${escapeHtml(it.namaBarang)}</b>
         <div class="meta">${escapeHtml(it.namaToko)}${it.noHpToko ? ' · ' + escapeHtml(it.noHpToko) : ''}</div>
         <div class="meta">${escapeHtml(it.alamatToko || '-')}</div>
-        <div class="meta">Dibeli oleh ${escapeHtml(it.namaPembeli)} · ${formatTimestamp(it.createdAt)}</div>
+        <div class="meta">Dibeli oleh ${escapeHtml(it.namaPembeli)} · ${pembelianTanggalDisplay(it)}</div>
         ${it.catatan ? `<div class="meta">Catatan: ${escapeHtml(it.catatan)}</div>` : ''}
         ${it.createdBy ? `<div class="meta">Diinput oleh ${escapeHtml(it.createdBy)}</div>` : ''}
         ${linkedPo ? `<div class="meta">🔗 Untuk PO: ${escapeHtml(linkedPo.tujuanSppg)} (${formatDate(linkedPo.tanggalPo)})</div>` : ''}
@@ -313,11 +319,11 @@ export function downloadLaporanPembelian() {
     return;
   }
 
-  const headers = ['Tanggal & Jam', 'Nama Toko', 'No. HP Toko', 'Alamat Toko', 'Nama Pembeli', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga (Rp)', 'Untuk PO', 'Catatan', 'Diinput Oleh'];
+  const headers = ['Tanggal', 'Nama Toko', 'No. HP Toko', 'Alamat Toko', 'Nama Pembeli', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga (Rp)', 'Untuk PO', 'Catatan', 'Diinput Oleh'];
   const rows = items.map(it => {
     const linkedPo = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
     return [
-      formatTimestamp(it.createdAt), it.namaToko, it.noHpToko || '', it.alamatToko || '',
+      pembelianTanggalDisplay(it), it.namaToko, it.noHpToko || '', it.alamatToko || '',
       it.namaPembeli, it.namaBarang, it.jumlah, it.satuan, it.harga,
       linkedPo ? `${linkedPo.tujuanSppg} (${formatDate(linkedPo.tanggalPo)})` : '',
       it.catatan || '', it.createdBy || '',
