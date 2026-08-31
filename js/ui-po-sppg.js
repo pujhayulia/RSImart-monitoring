@@ -193,7 +193,21 @@ export function renderPoSppg() {
   if (aktifEl) aktifEl.textContent = String(aktif);
 
   const importBar = document.getElementById('poImportBar');
-  if (importBar) importBar.classList.toggle('hidden', isArsipImported());
+  if (importBar) {
+    const perluNota = isArsipImported() && arsipPerluNota();
+    importBar.classList.toggle('hidden', isArsipImported() && !perluNota);
+    const spanEl = importBar.querySelector('span');
+    const btnEl = document.getElementById('btnImportArsipPo');
+    if (spanEl && btnEl && !btnEl.disabled) {
+      if (perluNota) {
+        spanEl.textContent = '⚠️ Arsip LPJ Pengadaan Bahan Baku sudah masuk PO, tapi belum tercatat sebagai Total Pemasukan di Laporan Keuangan Koperasi.';
+        btnEl.textContent = 'Lengkapi Data Pemasukan Arsip';
+      } else {
+        spanEl.textContent = '📦 Ada arsip LPJ Pengadaan Bahan Baku (April–Agustus 2026) dari dashboard keuangan koperasi — lengkap dengan data pembelian & biaya operasional, jadi margin/profit-nya langsung terhitung — yang belum dimasukkan ke sistem.';
+        btnEl.textContent = 'Import Arsip Sekarang';
+      }
+    }
+  }
 
   if (list.length === 0) {
     logEl.innerHTML = `<div class="empty-state">Belum ada PO dari SPPG untuk filter ini.</div>`;
@@ -206,6 +220,11 @@ export function renderPoSppg() {
 
 function isArsipImported() {
   return state.lastPoSppgItems.some(po => po.importBatch === MARGIN_LAMA_BATCH);
+}
+
+/** PO arsip yang statusnya sudah "terkirim" tapi belum ada nota Distribusi SPPG yang menyertai — jadi belum tercatat sebagai Total Pemasukan di Laporan Keuangan Koperasi. */
+function arsipPerluNota() {
+  return state.lastPoSppgItems.some(po => po.importBatch === MARGIN_LAMA_BATCH && !po.distribusiId);
 }
 
 /** Hapus arsip PO lama (batch sebelum ada data pembelian/margin) kalau pernah diimpor — digantikan arsip LPJ yang baru. */
@@ -230,27 +249,32 @@ async function hapusArsipPoLama() {
 }
 
 async function importArsipLama() {
-  const totalDocs = MARGIN_LAMA_DATA.reduce((s, rec) => s + 1 + rec.items.length + rec.biayaOperasional.length, 0);
-  if (!confirm(
-    `Import arsip LPJ Pengadaan Bahan Baku (April–Agustus 2026): ${MARGIN_LAMA_DATA.length} PO lengkap dengan data pembelian & biaya operasional (total ${totalDocs} dokumen).\n\n` +
-    `Arsip lama (tanpa data margin) akan dihapus otomatis dan digantikan arsip ini. Proses bisa makan waktu beberapa menit. Lanjutkan?`
-  )) return;
+  const perluNotaSaja = isArsipImported() && arsipPerluNota();
+  const totalDocs = MARGIN_LAMA_DATA.reduce((s, rec) => s + 2 + rec.items.length + rec.biayaOperasional.length, 0);
+  const confirmMsg = perluNotaSaja
+    ? `Arsip LPJ sudah pernah diimpor, tapi belum tercatat sebagai Total Pemasukan di Laporan Keuangan Koperasi (belum ada nota Distribusi SPPG). Lengkapi sekarang?`
+    : `Import arsip LPJ Pengadaan Bahan Baku (April–Agustus 2026): ${MARGIN_LAMA_DATA.length} PO lengkap dengan nota pemasukan, data pembelian & biaya operasional (total ${totalDocs} dokumen).\n\n` +
+      `Arsip lama (tanpa data margin) akan dihapus otomatis dan digantikan arsip ini. Proses bisa makan waktu beberapa menit. Lanjutkan?`;
+  if (!confirm(confirmMsg)) return;
 
   const existingKeys = new Set(
     state.lastPoSppgItems.filter(po => po.importBatch === MARGIN_LAMA_BATCH).map(po => `${po.tanggalPo}|${po.tujuanSppg}`)
   );
+  const poTanpaNota = state.lastPoSppgItems.filter(po => po.importBatch === MARGIN_LAMA_BATCH && !po.distribusiId);
 
   const btn = document.getElementById('btnImportArsipPo');
-  if (btn) { btn.disabled = true; btn.textContent = 'Membersihkan arsip lama...'; }
-  try {
-    await hapusArsipPoLama();
-  } catch (e) {
-    console.error('Gagal menghapus arsip PO lama', e);
+  if (btn) { btn.disabled = true; btn.textContent = perluNotaSaja ? 'Melengkapi data pemasukan...' : 'Membersihkan arsip lama...'; }
+  if (!perluNotaSaja) {
+    try {
+      await hapusArsipPoLama();
+    } catch (e) {
+      console.error('Gagal menghapus arsip PO lama', e);
+    }
   }
 
   let batch = writeBatch(state.db);
   let opsInBatch = 0;
-  let poCount = 0, pembelianCount = 0, biayaCount = 0;
+  let poCount = 0, pembelianCount = 0, biayaCount = 0, notaCount = 0;
 
   const flush = async () => {
     if (opsInBatch === 0) return;
@@ -265,6 +289,7 @@ async function importArsipLama() {
     if (btn) btn.textContent = `Mengimpor... (${poCount}/${MARGIN_LAMA_DATA.length} PO)`;
 
     const poRef = doc(collection(state.db, 'poSppg'));
+    const notaRef = doc(collection(state.db, 'distribusiSppg'));
     const items = rec.items.map((it, idx) => ({
       namaBarang: it.namaBarang,
       jumlah: it.jumlah,
@@ -279,7 +304,7 @@ async function importArsipLama() {
       items,
       catatan: 'Arsip LPJ Pengadaan Bahan Baku (diimpor dari dashboard keuangan koperasi)',
       status: 'terkirim',
-      distribusiId: null,
+      distribusiId: notaRef.id,
       invoiceNomor: null,
       importBatch: MARGIN_LAMA_BATCH,
       createdAt: serverTimestamp(),
@@ -287,6 +312,21 @@ async function importArsipLama() {
     });
     opsInBatch += 1;
     poCount += 1;
+    if (opsInBatch >= 450) await flush();
+
+    batch.set(notaRef, {
+      tanggalKirim: rec.tanggal,
+      jamKirim: '',
+      tujuanSppg: rec.tujuanSppg,
+      catatan: 'Arsip LPJ Pengadaan Bahan Baku (diimpor dari dashboard keuangan koperasi)',
+      items: rec.items.map(it => ({ namaBarang: it.namaBarang, jumlah: it.jumlah, satuan: it.satuan, hargaJual: it.hargaSatuan })),
+      poId: poRef.id,
+      importBatch: MARGIN_LAMA_BATCH,
+      createdAt: serverTimestamp(),
+      createdBy: state.currentUserEmail,
+    });
+    opsInBatch += 1;
+    notaCount += 1;
     if (opsInBatch >= 450) await flush();
 
     for (let idx = 0; idx < rec.items.length; idx++) {
@@ -332,16 +372,46 @@ async function importArsipLama() {
 
     existingKeys.add(key);
   }
+
+  // Arsip yang sudah lebih dulu diimpor (sebelum fitur nota-pemasukan ini ada) belum punya
+  // nota Distribusi SPPG — lengkapi di sini pakai data yang sudah tersimpan di PO-nya sendiri.
+  for (const po of poTanpaNota) {
+    if (btn) btn.textContent = `Melengkapi data pemasukan... (${notaCount})`;
+    const notaRef = doc(collection(state.db, 'distribusiSppg'));
+    batch.set(notaRef, {
+      tanggalKirim: po.tanggalPo,
+      jamKirim: '',
+      tujuanSppg: po.tujuanSppg,
+      catatan: 'Arsip LPJ Pengadaan Bahan Baku (diimpor dari dashboard keuangan koperasi)',
+      items: (po.items || []).map(it => ({ namaBarang: it.namaBarang, jumlah: it.jumlah, satuan: it.satuan, hargaJual: it.hargaFinal ?? it.hargaRencana })),
+      poId: po.id,
+      importBatch: MARGIN_LAMA_BATCH,
+      createdAt: serverTimestamp(),
+      createdBy: state.currentUserEmail,
+    });
+    opsInBatch += 1;
+    notaCount += 1;
+    if (opsInBatch >= 450) await flush();
+
+    batch.update(doc(state.db, 'poSppg', po.id), { distribusiId: notaRef.id });
+    opsInBatch += 1;
+    if (opsInBatch >= 450) await flush();
+  }
+
   await flush();
 
-  if (poCount > 0) {
+  if (poCount > 0 || notaCount > 0) {
     logActivity({
       action: 'tambah', modul: 'Koperasi - PO SPPG',
-      ringkasan: `Import arsip LPJ: ${poCount} PO, ${pembelianCount} pembelian, ${biayaCount} biaya operasional (April–Agustus 2026)`,
+      ringkasan: poCount > 0
+        ? `Import arsip LPJ: ${poCount} PO, ${notaCount} nota pemasukan, ${pembelianCount} pembelian, ${biayaCount} biaya operasional (April–Agustus 2026)`
+        : `Lengkapi data pemasukan arsip LPJ: ${notaCount} nota Distribusi SPPG`,
     });
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Import Arsip Sekarang'; }
-  alert(`Selesai. ${poCount} PO, ${pembelianCount} pembelian, dan ${biayaCount} biaya operasional berhasil diimpor.`);
+  alert(poCount > 0
+    ? `Selesai. ${poCount} PO, ${notaCount} nota pemasukan, ${pembelianCount} pembelian, dan ${biayaCount} biaya operasional berhasil diimpor.`
+    : `Selesai. ${notaCount} nota pemasukan berhasil dilengkapi — sekarang tercatat di Total Pemasukan.`);
 }
 
 /** Semua catatan Pembelian yang ditautkan ke barang PO tertentu (poId + itemId). */
