@@ -77,7 +77,7 @@
 <div class="wrap">
   <div class="eyebrow">rsi-site &middot; referensi teknis &middot; interaktif</div>
   <h1>Peta Orbit Modul</h1>
-  <p class="lede"><code class="mono">main.js</code> di pusat sebagai "matahari" — semua modul lain diinisialisasi &amp; dihubungkan dari sana. Inti bersama (state, router, dll) mengorbit dekat; modul Web RSI dan Koperasi mengorbit lebih jauh di sisi berlawanan, dengan <code class="mono">po-lama-data.js</code> jadi "bulan" kecil yang mengitari <code class="mono">ui-po-sppg.js</code>.</p>
+  <p class="lede"><code class="mono">main.js</code> di pusat sebagai "matahari" — semua modul lain diinisialisasi &amp; dihubungkan dari sana. Inti bersama (state, router, dll) mengorbit dekat; modul Web RSI dan Koperasi mengorbit lebih jauh di sisi berlawanan, dengan <code class="mono">margin-lama-data.js</code> jadi "bulan" kecil yang mengitari <code class="mono">ui-po-sppg.js</code>.</p>
 
   <div class="legend">
     <div class="legend-item"><span class="dot main"></span>main.js (pusat)</div>
@@ -94,7 +94,7 @@
 
   <div class="insight-row">
     <div class="insight"><b>Tidak ada impor langsung antar modul.</b> Sisi biru (RSI) dan sisi teal (Koperasi) tidak pernah saling terhubung langsung — cuma lewat main.js di tengah dan koleksi <code class="mono">activityLog</code> yang dipakai bersama.</div>
-    <div class="insight"><b>Satu bulan kecil:</b> <code class="mono">po-lama-data.js</code> cuma dipakai oleh <code class="mono">ui-po-sppg.js</code> (data arsip 40 PO lama untuk tombol "Import Arsip") — makanya digambar sebagai satelit kecil, bukan planet penuh.</div>
+    <div class="insight"><b>Satu bulan kecil:</b> <code class="mono">margin-lama-data.js</code> cuma dipakai oleh <code class="mono">ui-po-sppg.js</code> (data arsip PO+Pembelian+Biaya Operasional dari LPJ Pengadaan Bahan Baku untuk tombol "Import Arsip") — makanya digambar sebagai satelit kecil, bukan planet penuh.</div>
   </div>
 
   <footer>Dibuat dari struktur <code class="mono">js/*.js</code> pada 28 Agustus 2026 — kalau ada file baru, minta dibuatkan ulang. Diagram ini pakai simulasi fisika ringan (tolak-menolak antar titik + "per" di sepanjang garis) yang ditulis langsung dengan SVG + JavaScript, tanpa library eksternal.</footer>
@@ -133,7 +133,7 @@ const NODES = [
   {id:'biayaop',label:'ui-biaya-operasional.js',cat:'kop',x:1024.5,y:730.3,r:18},
   {id:'berandaKop',label:'ui-beranda-koperasi.js',cat:'kop',x:907.7,y:917.3,r:18},
   {id:'laporan',label:'ui-laporan-keuangan-koperasi.js',cat:'kop',x:709.5,y:1013.9,r:18},
-  {id:'polama',label:'po-lama-data.js',cat:'moon',x:1091.8,y:490.5,r:12}
+  {id:'polama',label:'margin-lama-data.js',cat:'moon',x:1091.8,y:490.5,r:12}
 ];
 
 const EDGES = [

@@ -217,10 +217,15 @@ melihat data yang sama secara real-time.
     invoice otomatis (format `INV/{tahun}/{urut}`), kop surat & info rekening
     koperasi diatur di `js/data.js` (`KOPERASI_INFO`). Halaman ini juga punya
     tombol **"Import Arsip Sekarang"** (muncul otomatis kalau belum pernah
-    dijalankan) untuk memasukkan arsip PO lama (Maret–Agustus 2026, data dari
-    file Excel koperasi) sebagai riwayat berstatus "Terkirim" — sumber
-    datanya ada di `js/po-lama-data.js`, aman diklik berkali-kali karena
-    dicek dulu lewat penanda `importBatch` sebelum menyimpan ulang.
+    dijalankan) untuk memasukkan arsip LPJ Pengadaan Bahan Baku (April–Agustus
+    2026, dari dashboard keuangan koperasi) sebagai riwayat berstatus
+    "Terkirim" — lengkap dengan data Pembelian (realisasi beli, tertaut ke
+    tiap barang PO) dan Biaya Operasional, jadi Margin Kotor & Total Profit
+    Real langsung terhitung untuk periode itu. Sumber datanya ada di
+    `js/margin-lama-data.js` (~4.500 dokumen, ditulis pakai batch write
+    Firestore supaya cepat). Aman diklik berkali-kali karena dicek dulu lewat
+    penanda `importBatch` sebelum menyimpan ulang; arsip lama yang belum
+    punya data margin otomatis dihapus & digantikan.
   - **Pembelian**: satu barang yang dibeli = satu dokumen tersendiri, dengan
     tanggal & jam otomatis dari Firestore server timestamp. Bisa opsional
     dikaitkan ke satu barang di PO tertentu ("Kaitkan ke PO") — cocok kalau

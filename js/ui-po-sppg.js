@@ -6,7 +6,8 @@
 // dibaca oleh ui-distribusi-sppg.js). Saat "terkirim", PO bisa dicetak jadi
 // Invoice/Berita Acara (nomor invoice otomatis, format INV/{tahun}/{urut}).
 import {
-  collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
+  collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp,
+  writeBatch, getDocs, where,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
 import { KOPERASI_INFO } from './data.js';
@@ -15,7 +16,10 @@ import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 import { printReport } from './print-report.js';
 import { navigateTo } from './router.js';
-import { PO_LAMA_BATCH, PO_LAMA_DATA } from './po-lama-data.js';
+import { MARGIN_LAMA_BATCH, MARGIN_LAMA_DATA } from './margin-lama-data.js';
+
+// Batch lama (sebelum ada data pembelian/margin) — dibersihkan otomatis saat arsip baru diimpor.
+const OLD_PO_LAMA_BATCH = 'arsip-po-2026-08';
 
 const LOGO_URL = 'assets/invoice/logo-koperasi.png';
 const STEMPEL_URL = 'assets/invoice/stempel-koperasi.png';
@@ -161,17 +165,18 @@ function filteredPo() {
 function poTotal(po) {
   const items = po.items || [];
   const hasFinal = items.some(it => typeof it.hargaFinal === 'number');
-  return items.reduce((sum, it) => {
+  const total = items.reduce((sum, it) => {
     const h = hasFinal ? it.hargaFinal : it.hargaRencana;
     const jumlah = typeof it.jumlah === 'number' ? it.jumlah : 0;
     return sum + (typeof h === 'number' ? h * jumlah : 0);
   }, 0);
+  return Math.round(total);
 }
 
 function itemSubtotal(it, useFinal) {
   const h = useFinal ? it.hargaFinal : it.hargaRencana;
   const jumlah = typeof it.jumlah === 'number' ? it.jumlah : 0;
-  return typeof h === 'number' ? h * jumlah : null;
+  return typeof h === 'number' ? Math.round(h * jumlah) : null;
 }
 
 export function renderPoSppg() {
@@ -200,44 +205,143 @@ export function renderPoSppg() {
 }
 
 function isArsipImported() {
-  return state.lastPoSppgItems.some(po => po.importBatch === PO_LAMA_BATCH);
+  return state.lastPoSppgItems.some(po => po.importBatch === MARGIN_LAMA_BATCH);
+}
+
+/** Hapus arsip PO lama (batch sebelum ada data pembelian/margin) kalau pernah diimpor — digantikan arsip LPJ yang baru. */
+async function hapusArsipPoLama() {
+  const q = query(collection(state.db, 'poSppg'), where('importBatch', '==', OLD_PO_LAMA_BATCH));
+  const snap = await getDocs(q);
+  if (snap.empty) return 0;
+  let batch = writeBatch(state.db);
+  let opsInBatch = 0;
+  let deleted = 0;
+  for (const d of snap.docs) {
+    batch.delete(d.ref);
+    opsInBatch += 1; deleted += 1;
+    if (opsInBatch >= 450) {
+      await batch.commit();
+      batch = writeBatch(state.db);
+      opsInBatch = 0;
+    }
+  }
+  if (opsInBatch > 0) await batch.commit();
+  return deleted;
 }
 
 async function importArsipLama() {
-  if (!confirm(`Import ${PO_LAMA_DATA.length} arsip PO lama (Maret–Agustus 2026) ke sistem? Data masuk berstatus "Terkirim" sebagai riwayat, tidak memicu invoice.`)) return;
+  const totalDocs = MARGIN_LAMA_DATA.reduce((s, rec) => s + 1 + rec.items.length + rec.biayaOperasional.length, 0);
+  if (!confirm(
+    `Import arsip LPJ Pengadaan Bahan Baku (April–Agustus 2026): ${MARGIN_LAMA_DATA.length} PO lengkap dengan data pembelian & biaya operasional (total ${totalDocs} dokumen).\n\n` +
+    `Arsip lama (tanpa data margin) akan dihapus otomatis dan digantikan arsip ini. Proses bisa makan waktu beberapa menit. Lanjutkan?`
+  )) return;
+
   const existingKeys = new Set(
-    state.lastPoSppgItems.filter(po => po.importBatch === PO_LAMA_BATCH).map(po => `${po.tanggalPo}|${po.tujuanSppg}`)
+    state.lastPoSppgItems.filter(po => po.importBatch === MARGIN_LAMA_BATCH).map(po => `${po.tanggalPo}|${po.tujuanSppg}`)
   );
+
   const btn = document.getElementById('btnImportArsipPo');
-  if (btn) { btn.disabled = true; btn.textContent = 'Mengimpor...'; }
-  let count = 0;
-  for (const rec of PO_LAMA_DATA) {
-    const key = `${rec.tanggalPo}|${rec.tujuanSppg}`;
+  if (btn) { btn.disabled = true; btn.textContent = 'Membersihkan arsip lama...'; }
+  try {
+    await hapusArsipPoLama();
+  } catch (e) {
+    console.error('Gagal menghapus arsip PO lama', e);
+  }
+
+  let batch = writeBatch(state.db);
+  let opsInBatch = 0;
+  let poCount = 0, pembelianCount = 0, biayaCount = 0;
+
+  const flush = async () => {
+    if (opsInBatch === 0) return;
+    await batch.commit();
+    batch = writeBatch(state.db);
+    opsInBatch = 0;
+  };
+
+  for (const rec of MARGIN_LAMA_DATA) {
+    const key = `${rec.tanggal}|${rec.tujuanSppg}`;
     if (existingKeys.has(key)) continue;
-    try {
-      await addDoc(collection(state.db, 'poSppg'), {
-        tanggalPo: rec.tanggalPo,
-        tujuanSppg: rec.tujuanSppg,
-        items: rec.items,
-        catatan: 'Arsip data lama (diimpor dari file PO Excel koperasi)',
-        status: 'terkirim',
-        distribusiId: null,
-        invoiceNomor: null,
-        importBatch: PO_LAMA_BATCH,
+    if (btn) btn.textContent = `Mengimpor... (${poCount}/${MARGIN_LAMA_DATA.length} PO)`;
+
+    const poRef = doc(collection(state.db, 'poSppg'));
+    const items = rec.items.map((it, idx) => ({
+      namaBarang: it.namaBarang,
+      jumlah: it.jumlah,
+      satuan: it.satuan,
+      hargaRencana: it.hargaSatuan,
+      hargaFinal: it.hargaSatuan,
+      itemId: `${poRef.id}-i${idx}`,
+    }));
+    batch.set(poRef, {
+      tanggalPo: rec.tanggal,
+      tujuanSppg: rec.tujuanSppg,
+      items,
+      catatan: 'Arsip LPJ Pengadaan Bahan Baku (diimpor dari dashboard keuangan koperasi)',
+      status: 'terkirim',
+      distribusiId: null,
+      invoiceNomor: null,
+      importBatch: MARGIN_LAMA_BATCH,
+      createdAt: serverTimestamp(),
+      createdBy: state.currentUserEmail,
+    });
+    opsInBatch += 1;
+    poCount += 1;
+    if (opsInBatch >= 450) await flush();
+
+    for (let idx = 0; idx < rec.items.length; idx++) {
+      const it = rec.items[idx];
+      const pbRef = doc(collection(state.db, 'pembelianBahanMakanan'));
+      batch.set(pbRef, {
+        namaToko: '(Arsip LPJ)',
+        noHpToko: '',
+        alamatToko: '',
+        namaPembeli: '(Arsip)',
+        namaBarang: it.namaBarang,
+        jumlah: it.jumlah,
+        satuan: it.satuan,
+        harga: it.realisasi ?? 0,
+        catatan: 'Realisasi arsip LPJ',
+        poId: poRef.id,
+        poItemId: items[idx].itemId,
         createdAt: serverTimestamp(),
         createdBy: state.currentUserEmail,
+        importBatch: MARGIN_LAMA_BATCH,
       });
-      existingKeys.add(key);
-      count += 1;
-    } catch (e) {
-      console.error('Gagal impor PO arsip', rec.tanggalPo, rec.tujuanSppg, e);
+      opsInBatch += 1;
+      pembelianCount += 1;
+      if (opsInBatch >= 450) await flush();
     }
+
+    for (const o of rec.biayaOperasional) {
+      const boRef = doc(collection(state.db, 'biayaOperasional'));
+      batch.set(boRef, {
+        tanggal: rec.tanggal,
+        lokasi: rec.tujuanSppg,
+        kategori: o.kategori,
+        keterangan: o.keterangan,
+        jumlah: o.jumlah,
+        createdAt: serverTimestamp(),
+        createdBy: state.currentUserEmail,
+        importBatch: MARGIN_LAMA_BATCH,
+      });
+      opsInBatch += 1;
+      biayaCount += 1;
+      if (opsInBatch >= 450) await flush();
+    }
+
+    existingKeys.add(key);
   }
-  if (count > 0) {
-    logActivity({ action: 'tambah', modul: 'Koperasi - PO SPPG', ringkasan: `Import arsip ${count} PO lama (Maret–Agustus 2026)` });
+  await flush();
+
+  if (poCount > 0) {
+    logActivity({
+      action: 'tambah', modul: 'Koperasi - PO SPPG',
+      ringkasan: `Import arsip LPJ: ${poCount} PO, ${pembelianCount} pembelian, ${biayaCount} biaya operasional (April–Agustus 2026)`,
+    });
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Import Arsip Sekarang'; }
-  alert(`Selesai. ${count} PO dari arsip berhasil diimpor.`);
+  alert(`Selesai. ${poCount} PO, ${pembelianCount} pembelian, dan ${biayaCount} biaya operasional berhasil diimpor.`);
 }
 
 /** Semua catatan Pembelian yang ditautkan ke barang PO tertentu (poId + itemId). */
@@ -272,7 +376,7 @@ export function computeMarginKotor(dari, sampai) {
       total += (hargaSatuan * dibeli) - realisasi;
     });
   });
-  return total;
+  return Math.round(total);
 }
 
 function renderCard(po) {
