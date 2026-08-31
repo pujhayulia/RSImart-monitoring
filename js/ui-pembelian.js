@@ -5,7 +5,7 @@ import {
   collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
-import { formatRupiah, formatDate, formatTimestamp, isTimestampInRange, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, timestampToLocalDateIso, escapeHtml } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
@@ -93,11 +93,25 @@ export function watchPembelian(onChange) {
   });
 }
 
+/**
+ * Tanggal efektif satu pembelian: tanggal PO yang ditautkan, kalau ada — supaya pembelian
+ * yang tanggal transaksi aslinya beda dari saat diinput (mis. arsip LPJ yang diimpor
+ * belakangan) tetap kefilter di tanggal transaksi yang benar. Kalau tidak ditautkan ke PO,
+ * pakai createdAt (waktu catatan ini disimpan).
+ */
+export function pembelianTanggalIso(it) {
+  if (it.poId) {
+    const po = (state.lastPoSppgItems || []).find(p => p.id === it.poId);
+    if (po && po.tanggalPo) return po.tanggalPo;
+  }
+  return timestampToLocalDateIso(it.createdAt);
+}
+
 function filteredPembelian() {
   const dari = document.getElementById('pembelianFilterDari').value;
   const sampai = document.getElementById('pembelianFilterSampai').value;
   if (!dari && !sampai) return state.lastPembelianItems;
-  return state.lastPembelianItems.filter(it => isTimestampInRange(it.createdAt, dari, sampai));
+  return state.lastPembelianItems.filter(it => isDateStrInRange(pembelianTanggalIso(it), dari, sampai));
 }
 
 /** Total belanja & jumlah transaksi dari SELURUH data yang sudah termuat (tanpa filter tanggal) — dipakai di Beranda Koperasi. */

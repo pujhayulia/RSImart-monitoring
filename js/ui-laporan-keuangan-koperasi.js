@@ -3,16 +3,18 @@
 // widget ringkasan di Beranda Koperasi maupun halaman Laporan Keuangan Koperasi ini,
 // supaya angkanya selalu konsisten di kedua tempat.
 import { state } from './state.js';
-import { formatRupiah, formatDate, formatTimestamp, timestampToLocalDateIso, isTimestampInRange, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, isDateStrInRange, escapeHtml } from './utils.js';
 import { notaInRange, flattenItems, itemNilai, notaTotalNilai } from './ui-distribusi-sppg.js';
 import { computeMarginKotor } from './ui-po-sppg.js';
 import { biayaOperasionalInRange } from './ui-biaya-operasional.js';
+import { pembelianTanggalIso } from './ui-pembelian.js';
 import { downloadCsv, dateRangeFileTag, dateRangeLabel } from './csv-export.js';
 import { printReport } from './print-report.js';
 
+/** Dipakai bareng buildLedger(): filter berdasarkan tanggal PO yang ditautkan (kalau ada), bukan createdAt — lihat pembelianTanggalIso(). */
 function pembelianInRange(dari, sampai) {
   if (!dari && !sampai) return state.lastPembelianItems;
-  return state.lastPembelianItems.filter(it => isTimestampInRange(it.createdAt, dari, sampai));
+  return state.lastPembelianItems.filter(it => isDateStrInRange(pembelianTanggalIso(it), dari, sampai));
 }
 
 export function computeKoperasiKeuangan(dari, sampai) {
@@ -43,9 +45,10 @@ export function computeKoperasiKeuangan(dari, sampai) {
 function buildLedger(data) {
   const ledger = [];
   data.pembelian.forEach(it => {
+    const tgl = pembelianTanggalIso(it);
     ledger.push({
-      tanggalSort: timestampToLocalDateIso(it.createdAt),
-      tanggalDisplay: formatTimestamp(it.createdAt),
+      tanggalSort: tgl,
+      tanggalDisplay: formatDate(tgl),
       keterangan: `Pembelian - ${it.namaBarang} dari ${it.namaToko}`,
       jenis: 'Pengeluaran',
       jumlah: typeof it.harga === 'number' ? it.harga : 0,
