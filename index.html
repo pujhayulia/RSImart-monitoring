@@ -430,17 +430,23 @@
             <h2>Rekap Keuangan</h2>
             <p>Dihitung otomatis dari jumlah × harga setiap pengiriman yang dicatat — tidak perlu input manual.</p>
           </div>
+          <div class="date-filter-row">
+            <input type="date" id="keuanganFilterDari" aria-label="Dari tanggal">
+            <span class="date-filter-sep">–</span>
+            <input type="date" id="keuanganFilterSampai" aria-label="Sampai tanggal">
+            <button type="button" class="btn-ghost" id="btnDownloadKeuangan">⬇ Download Laporan (CSV)</button>
+          </div>
           <div class="totals-row">
             <div class="total-card">
               <div class="lbl">Pemasukan Bulan Ini (Lunas)</div>
               <div class="val" id="finBulanIni">–</div>
             </div>
             <div class="total-card alt">
-              <div class="lbl">Pemasukan Semua Waktu (Lunas)</div>
+              <div class="lbl" id="finSemuaLbl">Pemasukan Semua Waktu (Lunas)</div>
               <div class="val" id="finSemua">–</div>
             </div>
             <div class="total-card amber">
-              <div class="lbl">Piutang Belum Dibayar</div>
+              <div class="lbl" id="finPiutangLbl">Piutang Belum Dibayar</div>
               <div class="val" id="finPiutang">–</div>
             </div>
           </div>
@@ -454,19 +460,8 @@
           </div>
 
           <div class="section-head section-head--sub">
-            <h3>Laporan Pengiriman & Keuangan</h3>
-            <p>Unduh seluruh riwayat pengiriman (lunas &amp; piutang) dalam rentang tanggal tertentu.</p>
-          </div>
-          <div class="date-filter-row">
-            <input type="date" id="keuanganFilterDari" aria-label="Dari tanggal">
-            <span class="date-filter-sep">–</span>
-            <input type="date" id="keuanganFilterSampai" aria-label="Sampai tanggal">
-            <button type="button" class="btn-ghost" id="btnDownloadKeuangan">⬇ Download Laporan (CSV)</button>
-          </div>
-
-          <div class="section-head section-head--sub">
             <h3>Ringkasan per Metode Pembayaran</h3>
-            <p>Dari transaksi yang sudah lunas.</p>
+            <p>Dari transaksi yang sudah lunas, mengikuti rentang tanggal di atas.</p>
           </div>
           <div class="fin-panel">
             <div class="fin-head fin-head--2col">
@@ -478,7 +473,7 @@
 
           <div class="section-head section-head--sub">
             <h3>Daftar Piutang</h3>
-            <p>Pesanan yang sudah dikirim tapi belum dibayar.</p>
+            <p>Pesanan yang sudah dikirim tapi belum dibayar, mengikuti rentang tanggal di atas.</p>
           </div>
           <div class="dist-log" id="piutangList"></div>
         </section>

@@ -5,10 +5,11 @@ import { renderDistItemHtml, wireDistItemActions } from './ui-dist-item.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
 /** Dipakai bersama oleh halaman Keuangan dan ringkasan Beranda, supaya hitungannya satu sumber. */
-export function computeKeuanganSummary() {
+export function computeKeuanganSummary(dari, sampai) {
   const curYm = new Date().toISOString().slice(0, 7);
+  const hasFilter = !!(dari || sampai);
 
-  let totalBulanIni = 0, totalSemua = 0, totalPiutang = 0;
+  let totalBulanIni = 0, totalSemua = 0, totalPeriode = 0, totalPiutang = 0;
   const perProduk = {};
   const perMetode = {};
   const piutangItems = [];
@@ -17,10 +18,13 @@ export function computeKeuanganSummary() {
     const total = typeof it.total === 'number' ? it.total : 0;
     const lunas = !!it.dibayar;
     const tglKirim = it.tanggalKirim || it.tanggal || '';
+    const inRange = !hasFilter || isDateStrInRange(tglKirim, dari, sampai);
 
     if (lunas) {
       totalSemua += total;
       if (tglKirim.slice(0, 7) === curYm) totalBulanIni += total;
+      if (!inRange) return;
+      totalPeriode += total;
 
       const key = it.produkNama || 'Lainnya';
       if (!perProduk[key]) perProduk[key] = { qty: 0, total: 0, satuan: it.satuan || '' };
@@ -30,28 +34,36 @@ export function computeKeuanganSummary() {
       const metodeKey = it.metodeBayar || 'Tunai';
       perMetode[metodeKey] = (perMetode[metodeKey] || 0) + total;
     } else {
+      if (!inRange) return;
       totalPiutang += total;
       piutangItems.push(it);
     }
   });
 
-  return { totalBulanIni, totalSemua, totalPiutang, perProduk, perMetode, piutangItems };
+  return { totalBulanIni, totalSemua, totalPeriode, totalPiutang, perProduk, perMetode, piutangItems, hasFilter };
 }
 
 export function renderKeuangan() {
   const bulanIniEl = document.getElementById('finBulanIni');
   const semuaEl = document.getElementById('finSemua');
+  const semuaLblEl = document.getElementById('finSemuaLbl');
   const piutangEl = document.getElementById('finPiutang');
+  const piutangLblEl = document.getElementById('finPiutangLbl');
   const tableEl = document.getElementById('finTable');
   const piutangListEl = document.getElementById('piutangList');
   const metodeTableEl = document.getElementById('finMetodeTable');
   if (!bulanIniEl) return;
 
-  const { totalBulanIni, totalSemua, totalPiutang, perProduk, perMetode, piutangItems } = computeKeuanganSummary();
+  const dari = document.getElementById('keuanganFilterDari')?.value || '';
+  const sampai = document.getElementById('keuanganFilterSampai')?.value || '';
+  const { totalBulanIni, totalSemua, totalPeriode, totalPiutang, perProduk, perMetode, piutangItems, hasFilter }
+    = computeKeuanganSummary(dari, sampai);
 
   bulanIniEl.textContent = formatRupiah(totalBulanIni);
-  semuaEl.textContent = formatRupiah(totalSemua);
+  semuaEl.textContent = formatRupiah(hasFilter ? totalPeriode : totalSemua);
+  if (semuaLblEl) semuaLblEl.textContent = hasFilter ? 'Pemasukan Periode Ini (Lunas)' : 'Pemasukan Semua Waktu (Lunas)';
   if (piutangEl) piutangEl.textContent = formatRupiah(totalPiutang);
+  if (piutangLblEl) piutangLblEl.textContent = hasFilter ? 'Piutang Belum Dibayar (Periode Ini)' : 'Piutang Belum Dibayar';
 
   const rows = Object.entries(perProduk).sort((a, b) => b[1].total - a[1].total);
   tableEl.innerHTML = rows.length === 0
@@ -119,4 +131,7 @@ export function downloadLaporanKeuangan() {
 
 export function initKeuanganReportEvents() {
   document.getElementById('btnDownloadKeuangan').addEventListener('click', downloadLaporanKeuangan);
+  ['keuanganFilterDari', 'keuanganFilterSampai'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderKeuangan);
+  });
 }
