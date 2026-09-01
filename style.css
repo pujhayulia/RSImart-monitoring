@@ -314,6 +314,7 @@ select, input, button, textarea{
 .koperasi-totals--3col{grid-template-columns:repeat(3,1fr);max-width:640px;}
 .date-filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 .date-filter-row input[type="date"]{font-size:12.5px;padding:8px 10px;}
+.date-filter-row input[type="text"]{font-size:12.5px;padding:8px 10px;flex:1;min-width:220px;}
 .date-filter-sep{color:var(--muted);font-size:12px;}
 .activity-filter-row select,.activity-filter-row input[type="text"]{font-size:12.5px;padding:8px 10px;}
 .activity-filter-row input[type="text"]{width:170px;}

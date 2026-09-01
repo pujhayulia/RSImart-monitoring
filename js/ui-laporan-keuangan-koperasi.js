@@ -67,13 +67,28 @@ function buildLedger(data) {
   return ledger;
 }
 
+/** Total belanja per nama barang dalam periode ini — dipakai juga untuk gambaran kebutuhan stok ke depan (lihat lkCariBahan). */
 function buildBreakdownPengeluaran(pembelian) {
   const map = {};
   pembelian.forEach(it => {
     const key = it.namaBarang || 'Lainnya';
-    map[key] = (map[key] || 0) + (typeof it.harga === 'number' ? it.harga : 0);
+    if (!map[key]) map[key] = { nama: key, jumlah: 0, satuan: it.satuan || '', total: 0 };
+    map[key].jumlah += typeof it.jumlah === 'number' ? it.jumlah : 0;
+    map[key].total += typeof it.harga === 'number' ? it.harga : 0;
   });
-  return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  return Object.values(map).sort((a, b) => b.total - a.total);
+}
+
+function breakdownPengeluaranRowsHtml(rows) {
+  return rows.length === 0
+    ? `<div class="empty-state">Tidak ada barang yang cocok.</div>`
+    : rows.map(r => `
+      <div class="fin-row">
+        <div class="fin-name">${escapeHtml(r.nama)}</div>
+        <div class="fin-qty">${r.jumlah} ${escapeHtml(r.satuan)}</div>
+        <div class="fin-total">${formatRupiah(r.total)}</div>
+      </div>
+    `).join('');
 }
 
 function buildBreakdownPemasukan(notaList) {
@@ -164,7 +179,10 @@ export function renderLaporanKeuanganKoperasi() {
       </div>
     `).join('');
 
-  document.getElementById('lkBreakdownPengeluaran').innerHTML = finRowsHtml(buildBreakdownPengeluaran(data.pembelian));
+  const cariBahan = (document.getElementById('lkCariBahan')?.value || '').trim().toLowerCase();
+  let breakdownPengeluaran = buildBreakdownPengeluaran(data.pembelian);
+  if (cariBahan) breakdownPengeluaran = breakdownPengeluaran.filter(r => r.nama.toLowerCase().includes(cariBahan));
+  document.getElementById('lkBreakdownPengeluaran').innerHTML = breakdownPengeluaranRowsHtml(breakdownPengeluaran);
   document.getElementById('lkBreakdownPemasukan').innerHTML = finRowsHtml(buildBreakdownPemasukan(data.notaList));
 }
 
@@ -223,9 +241,9 @@ export function downloadLaporanKeuanganPdf() {
     </table>
     <h3>Pengeluaran per Jenis Barang</h3>
     <table>
-      <thead><tr><th>Barang</th><th>Total</th></tr></thead>
+      <thead><tr><th>Barang</th><th>Jumlah Dibeli</th><th>Total</th></tr></thead>
       <tbody>
-        ${buildBreakdownPengeluaran(data.pembelian).map(([nama, total]) => `<tr><td>${escapeHtml(nama)}</td><td>${formatRupiah(total)}</td></tr>`).join('')}
+        ${buildBreakdownPengeluaran(data.pembelian).map(r => `<tr><td>${escapeHtml(r.nama)}</td><td>${r.jumlah} ${escapeHtml(r.satuan)}</td><td>${formatRupiah(r.total)}</td></tr>`).join('')}
       </tbody>
     </table>
     <h3>Pemasukan per SPPG Tujuan</h3>
@@ -242,9 +260,11 @@ export function downloadLaporanKeuanganPdf() {
 export function initLaporanKeuanganKoperasiEvents() {
   document.getElementById('lkFilterDari').addEventListener('change', renderLaporanKeuanganKoperasi);
   document.getElementById('lkFilterSampai').addEventListener('change', renderLaporanKeuanganKoperasi);
+  document.getElementById('lkCariBahan').addEventListener('input', renderLaporanKeuanganKoperasi);
   document.getElementById('btnLkFilterReset').addEventListener('click', () => {
     document.getElementById('lkFilterDari').value = '';
     document.getElementById('lkFilterSampai').value = '';
+    document.getElementById('lkCariBahan').value = '';
     renderLaporanKeuanganKoperasi();
   });
   document.getElementById('btnDownloadLkCsv').addEventListener('click', downloadLaporanKeuanganCsv);
