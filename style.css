@@ -600,6 +600,7 @@ footer{margin-top:56px;text-align:center;font-size:11.5px;color:var(--muted);}
   .print-report .invoice-signature-3col .sig-visual{position:relative;height:92px;width:100%;max-width:150px;}
   .print-report .invoice-signature-3col .sig-stempel{position:absolute;left:0;top:4px;width:62px;mix-blend-mode:multiply;}
   .print-report .invoice-signature-3col .sig-ttd{position:absolute;left:36px;top:28px;width:88px;mix-blend-mode:multiply;}
+  .print-report .invoice-signature-3col .sig-ttd-solo{left:6px;top:18px;width:110px;}
   .print-report .invoice-signature .sig-space,.print-report .invoice-signature-2col .sig-space{height:50px;}
   .print-report .invoice-signature-3col .sig-space{height:92px;}
   .print-report .invoice-signature .sig-name,.print-report .invoice-signature-2col .sig-name,.print-report .invoice-signature-3col .sig-name{font-weight:700;text-decoration:underline;}

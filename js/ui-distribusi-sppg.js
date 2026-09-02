@@ -16,6 +16,13 @@ import { markPoTerkirim } from './ui-po-sppg.js';
 const LOGO_URL = 'assets/invoice/logo-koperasi.png';
 const STEMPEL_URL = 'assets/invoice/stempel-koperasi.png';
 const TTD_URL = 'assets/invoice/ttd-koperasi.jpg';
+const TTD_MARGI_URL = 'assets/invoice/ttd-margi.jpg';
+
+/** Tanda tangan asli per nama pengirim, dipakai di kolom "Pengirim" Surat Jalan — kalau namanya tidak ada di sini, kolomnya dikosongkan untuk ditandatangani manual. Stempel koperasi cuma dipasangkan ke Ghufron karena dialah penanda tangan resminya. */
+const TTD_PENGIRIM = {
+  [KOPERASI_INFO.penandaTangan.toLowerCase()]: { ttd: TTD_URL, stempel: STEMPEL_URL },
+  'pak margi': { ttd: TTD_MARGI_URL, stempel: null },
+};
 
 /** "Dapur SPPG Sudimara Jaya" -> "Dapur_SPPG_Sudimara_Jaya" — dipakai untuk nama file unduhan (sama seperti di ui-po-sppg.js, sengaja tidak diimpor supaya kedua modul tidak saling bergantung). */
 function slugifyTujuan(tujuan) {
@@ -243,8 +250,7 @@ function printSuratJalanBody(nota) {
   `).join('');
 
   const pengirim = nota.suratJalanPengirim || KOPERASI_INFO.penandaTangan;
-  // Stempel & TTD yang tersimpan itu tanda tangan Ghufron — cuma ditampilkan kalau memang dialah pengirimnya, orang lain tanda tangan langsung di kolom kosong.
-  const isGhufron = pengirim.trim().toLowerCase() === KOPERASI_INFO.penandaTangan.toLowerCase();
+  const ttdPengirim = TTD_PENGIRIM[pengirim.trim().toLowerCase()];
 
   const body = `
     <div class="doc-accent-blue">
@@ -269,10 +275,10 @@ function printSuratJalanBody(nota) {
         <div>Pengirim,</div>
         <div>Penerima,</div>
         <div>Sopir / Pembawa,</div>
-        ${isGhufron ? `
+        ${ttdPengirim ? `
         <div class="sig-visual">
-          <img class="sig-stempel" src="${STEMPEL_URL}" alt="">
-          <img class="sig-ttd" src="${TTD_URL}" alt="">
+          ${ttdPengirim.stempel ? `<img class="sig-stempel" src="${ttdPengirim.stempel}" alt="">` : ''}
+          <img class="sig-ttd${ttdPengirim.stempel ? '' : ' sig-ttd-solo'}" src="${ttdPengirim.ttd}" alt="">
         </div>` : `<div class="sig-space"></div>`}
         <div class="sig-space"></div>
         <div class="sig-space"></div>
