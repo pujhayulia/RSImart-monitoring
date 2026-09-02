@@ -24,6 +24,46 @@ const TTD_PENGIRIM = {
   'pak margi': { ttd: TTD_MARGI_URL, stempel: null },
 };
 
+// Kata kunci bahan yang BUKAN sayur/kering dari Pasar Induk — dicek sebagai substring, jadi tidak peduli huruf besar/kecil
+// maupun variasi penulisan ("Ayam Fillet", "daging sapi", "Telor Puyuh", dst tetap kena). Di luar kata kunci ini = dianggap
+// sayur/bahan kering (kiriman Farhan).
+const KATEGORI_NONKERING_KEYWORDS = [
+  'ayam', 'daging', 'sapi', 'ikan', 'dori', 'patin', 'lele',
+  'telur', 'telor',
+  'beras',
+  'minyak',
+  'susu', 'keju', 'yogurt', 'mentega', 'margarin', 'margarine', 'butter',
+];
+
+function isBahanKering(namaBarang) {
+  const n = (namaBarang || '').toLowerCase();
+  return !KATEGORI_NONKERING_KEYWORDS.some(kw => n.includes(kw));
+}
+
+/**
+ * Pengirim default satu baris barang, berdasarkan kategori bahan & tujuan SPPG:
+ * - Sayur & bahan kering dari Pasar Induk -> selalu Farhan, ke SPPG manapun.
+ * - Bahan lain (ayam, daging, minyak, telur, beras, dst) -> Pak Margi kalau tujuannya
+ *   SPPG Meruya/Sudimara; SPPG lain (mis. Nambo) -> Ghufron, karena Margi cuma jalan ke dua itu.
+ */
+function defaultPengirimUntuk(namaBarang, tujuanSppg) {
+  if (isBahanKering(namaBarang)) return 'Farhan';
+  const t = (tujuanSppg || '').toLowerCase();
+  if (t.includes('meruya') || t.includes('sudimara')) return 'Pak Margi';
+  return KOPERASI_INFO.penandaTangan;
+}
+
+/** Kelompokkan barang satu nota per pengirim default-nya — dipakai untuk pecah Surat Jalan otomatis. */
+function kelompokkanPerPengirim(nota) {
+  const groups = new Map();
+  (nota.items || []).forEach(it => {
+    const pengirim = defaultPengirimUntuk(it.namaBarang, nota.tujuanSppg);
+    if (!groups.has(pengirim)) groups.set(pengirim, []);
+    groups.get(pengirim).push(it);
+  });
+  return Array.from(groups.entries()).map(([pengirim, items]) => ({ pengirim, items }));
+}
+
 /** "Dapur SPPG Sudimara Jaya" -> "Dapur_SPPG_Sudimara_Jaya" — dipakai untuk nama file unduhan (sama seperti di ui-po-sppg.js, sengaja tidak diimpor supaya kedua modul tidak saling bergantung). */
 function slugifyTujuan(tujuan) {
   return (tujuan || 'SPPG').trim().replace(/\s+/g, '_').replace(/[\\/:*?"<>|]/g, '');
@@ -41,7 +81,6 @@ let rowCounter = 0;
 let editingId = null;
 let linkedPoId = null; // id PO (poSppg) yang sedang dibuatkan nota ini, kalau datang dari alur "Buat Nota Pengiriman"
 let suratJalanExpandId = null; // nota yang sedang dibuka form "Nama Pengirim"-nya sebelum cetak Surat Jalan
-let lastSuratJalanPengirim = ''; // supaya form terisi default nama pengirim yang barusan dipakai
 
 function itemRowHtml(rowId) {
   return `
@@ -194,38 +233,53 @@ function toggleSuratJalanForm(notaId) {
 }
 
 function suratJalanFormHtml(nota) {
-  const defaultNama = nota.suratJalanPengirim || lastSuratJalanPengirim || KOPERASI_INFO.penandaTangan;
+  const groups = kelompokkanPerPengirim(nota);
+  const groupsHtml = groups.map((g, idx) => `
+    <div class="po-invoice-fields">
+      <label style="flex:1;min-width:240px;">
+        Pengirim untuk: ${g.items.map(it => escapeHtml(it.namaBarang)).join(', ')}
+        <input type="text" list="namaPengirimList" id="suratJalanPengirim-${nota.id}-${idx}" value="${escapeHtml(g.pengirim)}">
+      </label>
+    </div>
+  `).join('');
+  const label = groups.length > 1 ? `Cetak ${groups.length} Surat Jalan` : 'Cetak Surat Jalan';
   return `
     <div class="po-inline-form" data-suratjalan-form="${nota.id}">
-      <h4>Siapa yang mengantar barang ini?</h4>
-      <div class="po-invoice-fields">
-        <label>Nama Pengirim
-          <input type="text" list="namaPengirimList" id="suratJalanPengirim-${nota.id}" value="${escapeHtml(defaultNama)}">
-        </label>
-      </div>
+      <h4>${groups.length > 1
+        ? `Barang di nota ini dipecah jadi ${groups.length} Surat Jalan berdasarkan asal &amp; pengirimnya:`
+        : 'Siapa yang mengantar barang ini?'}</h4>
+      ${groupsHtml}
       <div class="po-inline-form-actions">
         <button type="button" class="btn-ghost" data-suratjalan-cancel="${nota.id}">Batal</button>
-        <button type="button" class="btn" data-suratjalan-submit="${nota.id}">${nota.suratJalanNomor ? 'Cetak Ulang Surat Jalan' : 'Cetak Surat Jalan'}</button>
+        <button type="button" class="btn" data-suratjalan-submit="${nota.id}">${nota.suratJalanNomor ? `Cetak Ulang${groups.length > 1 ? ` (${groups.length})` : ''}` : label}</button>
       </div>
     </div>`;
 }
 
-/** Nomor surat jalan sekali dibuat lalu dipatri ke notanya (mirip pola nomor invoice di PO SPPG) — cetak ulang memakai nomor yang sama, bukan bikin baru. Nama pengirim boleh diganti tiap cetak, karena bisa beda orang tergantung asal barangnya. */
+/**
+ * Nomor surat jalan sekali dibuat lalu dipatri ke notanya (mirip pola nomor invoice di PO SPPG) — cetak
+ * ulang memakai nomor yang sama, bukan bikin baru. Kalau barangnya kepecah ke beberapa pengirim, nomornya
+ * tetap satu (satu nota = satu nomor) tapi dicetak jadi beberapa halaman, satu halaman per pengirim.
+ */
 async function submitSuratJalan(notaId) {
   const nota = state.lastDistribusiSppgItems.find(n => n.id === notaId);
   if (!nota) return;
-  const pengirimInput = document.getElementById(`suratJalanPengirim-${notaId}`);
-  const pengirim = (pengirimInput ? pengirimInput.value.trim() : '') || KOPERASI_INFO.penandaTangan;
+  const groups = kelompokkanPerPengirim(nota).map((g, idx) => {
+    const input = document.getElementById(`suratJalanPengirim-${notaId}-${idx}`);
+    const pengirim = (input ? input.value.trim() : '') || g.pengirim;
+    return { pengirim, items: g.items };
+  });
   const tanggalSurat = nota.suratJalanTanggal || nota.tanggalKirim || todayIso();
   const nomor = nota.suratJalanNomor || nextSuratJalanNomor(tanggalSurat.slice(0, 4));
+  const pengirimGabungan = groups.map(g => g.pengirim).join(', ');
 
   try {
     await updateDoc(doc(state.db, 'distribusiSppg', notaId), {
-      suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat, suratJalanPengirim: pengirim,
+      suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat, suratJalanPengirim: pengirimGabungan,
       updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
     });
     if (!nota.suratJalanNomor) {
-      logActivity({ action: 'ubah', modul: 'Koperasi - Distribusi SPPG', ringkasan: `Cetak Surat Jalan ${nomor} untuk ${nota.tujuanSppg} (pengirim: ${pengirim})` });
+      logActivity({ action: 'ubah', modul: 'Koperasi - Distribusi SPPG', ringkasan: `Cetak Surat Jalan ${nomor} untuk ${nota.tujuanSppg} (pengirim: ${pengirimGabungan})` });
     }
   } catch (e) {
     console.error(e);
@@ -233,13 +287,11 @@ async function submitSuratJalan(notaId) {
     return;
   }
 
-  lastSuratJalanPengirim = pengirim;
   suratJalanExpandId = null;
-  printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat, suratJalanPengirim: pengirim });
+  printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat }, groups);
 }
 
-function printSuratJalanBody(nota) {
-  const items = nota.items || [];
+function suratJalanPageHtml(nota, pengirim, items, needsPageBreak) {
   const rows = items.map((it, i) => `
     <tr>
       <td>${i + 1}</td>
@@ -249,11 +301,10 @@ function printSuratJalanBody(nota) {
     </tr>
   `).join('');
 
-  const pengirim = nota.suratJalanPengirim || KOPERASI_INFO.penandaTangan;
   const ttdPengirim = TTD_PENGIRIM[pengirim.trim().toLowerCase()];
 
-  const body = `
-    <div class="doc-accent-blue">
+  return `
+    <div class="doc-accent-blue${needsPageBreak ? ' print-page-break' : ''}">
       <div class="invoice-head">
         ${suratJalanHeadCompanyHtml()}
         <div class="invoice-title">SURAT JALAN</div>
@@ -291,6 +342,11 @@ function printSuratJalanBody(nota) {
       </div>
     </div>
   `;
+}
+
+/** Satu nota bisa dicetak jadi beberapa Surat Jalan (satu halaman per pengirim) dalam satu kali cetak. */
+function printSuratJalanBody(nota, groups) {
+  const body = groups.map((g, idx) => suratJalanPageHtml(nota, g.pengirim, g.items, idx > 0)).join('');
   printReport(body, `SuratJalan-${slugifyTujuan(nota.tujuanSppg)}-${fileDateTag(nota.tanggalKirim)}`);
 }
 
