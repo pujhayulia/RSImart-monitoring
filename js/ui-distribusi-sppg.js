@@ -33,6 +33,8 @@ function fileDateTag(iso) {
 let rowCounter = 0;
 let editingId = null;
 let linkedPoId = null; // id PO (poSppg) yang sedang dibuatkan nota ini, kalau datang dari alur "Buat Nota Pengiriman"
+let suratJalanExpandId = null; // nota yang sedang dibuka form "Nama Pengirim"-nya sebelum cetak Surat Jalan
+let lastSuratJalanPengirim = ''; // supaya form terisi default nama pengirim yang barusan dipakai
 
 function itemRowHtml(rowId) {
   return `
@@ -173,28 +175,60 @@ function suratJalanHeadCompanyHtml() {
     </div>`;
 }
 
-/** Nomor surat jalan sekali dibuat lalu dipatri ke notanya (mirip pola nomor invoice di PO SPPG) — cetak ulang memakai nomor yang sama, bukan bikin baru. */
-async function cetakSuratJalan(notaId) {
+// Nama-nama yang biasa mengantar barang, buat pilihan cepat di kolom "Nama Pengirim" — beda barang/pemasok biasanya beda orang yang antar.
+const NAMA_PENGIRIM_UMUM = [KOPERASI_INFO.penandaTangan, 'Farhan', 'Pak Margi'];
+
+const CATATAN_PENERIMAAN_STANDAR = 'Mohon lakukan pemeriksaan jumlah dan kondisi barang saat penerimaan. Barang yang sudah ditandatangani dianggap telah diterima dalam keadaan baik dan lengkap.';
+
+/** Buka/tutup form kecil "Nama Pengirim" sebelum benar-benar cetak — satu nota bisa dikirim orang berbeda-beda tergantung asal barangnya. */
+function toggleSuratJalanForm(notaId) {
+  suratJalanExpandId = suratJalanExpandId === notaId ? null : notaId;
+  renderDistribusiSppg();
+}
+
+function suratJalanFormHtml(nota) {
+  const defaultNama = nota.suratJalanPengirim || lastSuratJalanPengirim || KOPERASI_INFO.penandaTangan;
+  return `
+    <div class="po-inline-form" data-suratjalan-form="${nota.id}">
+      <h4>Siapa yang mengantar barang ini?</h4>
+      <div class="po-invoice-fields">
+        <label>Nama Pengirim
+          <input type="text" list="namaPengirimList" id="suratJalanPengirim-${nota.id}" value="${escapeHtml(defaultNama)}">
+        </label>
+      </div>
+      <div class="po-inline-form-actions">
+        <button type="button" class="btn-ghost" data-suratjalan-cancel="${nota.id}">Batal</button>
+        <button type="button" class="btn" data-suratjalan-submit="${nota.id}">${nota.suratJalanNomor ? 'Cetak Ulang Surat Jalan' : 'Cetak Surat Jalan'}</button>
+      </div>
+    </div>`;
+}
+
+/** Nomor surat jalan sekali dibuat lalu dipatri ke notanya (mirip pola nomor invoice di PO SPPG) — cetak ulang memakai nomor yang sama, bukan bikin baru. Nama pengirim boleh diganti tiap cetak, karena bisa beda orang tergantung asal barangnya. */
+async function submitSuratJalan(notaId) {
   const nota = state.lastDistribusiSppgItems.find(n => n.id === notaId);
   if (!nota) return;
+  const pengirimInput = document.getElementById(`suratJalanPengirim-${notaId}`);
+  const pengirim = (pengirimInput ? pengirimInput.value.trim() : '') || KOPERASI_INFO.penandaTangan;
   const tanggalSurat = nota.suratJalanTanggal || nota.tanggalKirim || todayIso();
   const nomor = nota.suratJalanNomor || nextSuratJalanNomor(tanggalSurat.slice(0, 4));
 
   try {
     await updateDoc(doc(state.db, 'distribusiSppg', notaId), {
-      suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat,
+      suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat, suratJalanPengirim: pengirim,
       updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
     });
     if (!nota.suratJalanNomor) {
-      logActivity({ action: 'ubah', modul: 'Koperasi - Distribusi SPPG', ringkasan: `Cetak Surat Jalan ${nomor} untuk ${nota.tujuanSppg}` });
+      logActivity({ action: 'ubah', modul: 'Koperasi - Distribusi SPPG', ringkasan: `Cetak Surat Jalan ${nomor} untuk ${nota.tujuanSppg} (pengirim: ${pengirim})` });
     }
   } catch (e) {
     console.error(e);
-    alert('Gagal menyimpan nomor surat jalan. Cetak dibatalkan.');
+    alert('Gagal menyimpan surat jalan. Cetak dibatalkan.');
     return;
   }
 
-  printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat });
+  lastSuratJalanPengirim = pengirim;
+  suratJalanExpandId = null;
+  printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat, suratJalanPengirim: pengirim });
 }
 
 function printSuratJalanBody(nota) {
@@ -207,6 +241,10 @@ function printSuratJalanBody(nota) {
       <td>${escapeHtml(it.satuan || '')}</td>
     </tr>
   `).join('');
+
+  const pengirim = nota.suratJalanPengirim || KOPERASI_INFO.penandaTangan;
+  // Stempel & TTD yang tersimpan itu tanda tangan Ghufron — cuma ditampilkan kalau memang dialah pengirimnya, orang lain tanda tangan langsung di kolom kosong.
+  const isGhufron = pengirim.trim().toLowerCase() === KOPERASI_INFO.penandaTangan.toLowerCase();
 
   const body = `
     <div class="doc-accent-blue">
@@ -226,17 +264,19 @@ function printSuratJalanBody(nota) {
         <tbody>${rows}</tbody>
       </table>
       ${nota.catatan ? `<div style="margin-top:12px;font-size:11.5px;"><b>Catatan:</b> ${escapeHtml(nota.catatan)}</div>` : ''}
+      <div style="margin-top:6px;font-size:10.5px;color:#555;">${escapeHtml(CATATAN_PENERIMAAN_STANDAR)}</div>
       <div class="invoice-signature-3col">
         <div>Pengirim,</div>
         <div>Penerima,</div>
         <div>Sopir / Pembawa,</div>
+        ${isGhufron ? `
         <div class="sig-visual">
           <img class="sig-stempel" src="${STEMPEL_URL}" alt="">
           <img class="sig-ttd" src="${TTD_URL}" alt="">
-        </div>
+        </div>` : `<div class="sig-space"></div>`}
         <div class="sig-space"></div>
         <div class="sig-space"></div>
-        <div class="sig-name">${escapeHtml(KOPERASI_INFO.penandaTangan)}</div>
+        <div class="sig-name">${escapeHtml(pengirim)}</div>
         <div class="sig-name">&nbsp;</div>
         <div class="sig-name">&nbsp;</div>
         <div>${escapeHtml(KOPERASI_INFO.nama)}</div>
@@ -299,7 +339,8 @@ export function renderDistribusiSppg() {
         </div>
       `;
       }).join('')}
-    </div>`;
+    </div>
+    ${suratJalanExpandId === nota.id ? suratJalanFormHtml(nota) : ''}`;
   }).join('');
 
   logEl.querySelectorAll('button.del-btn').forEach(btn => {
@@ -313,7 +354,13 @@ export function renderDistribusiSppg() {
     });
   });
   logEl.querySelectorAll('button.nota-suratjalan-btn').forEach(btn => {
-    btn.addEventListener('click', () => cetakSuratJalan(btn.dataset.notaid));
+    btn.addEventListener('click', () => toggleSuratJalanForm(btn.dataset.notaid));
+  });
+  logEl.querySelectorAll('[data-suratjalan-cancel]').forEach(btn => {
+    btn.addEventListener('click', () => toggleSuratJalanForm(btn.dataset.suratjalanCancel));
+  });
+  logEl.querySelectorAll('[data-suratjalan-submit]').forEach(btn => {
+    btn.addEventListener('click', () => submitSuratJalan(btn.dataset.suratjalanSubmit));
   });
   logEl.querySelectorAll('button.edit-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -503,5 +550,7 @@ export function initDistribusiSppgEvents() {
   });
   document.getElementById('btnDownloadSppg').addEventListener('click', downloadLaporanDistribusiSppg);
   document.getElementById('btnCancelEditSppg').addEventListener('click', cancelEditSppg);
+  const pengirimList = document.getElementById('namaPengirimList');
+  if (pengirimList) pengirimList.innerHTML = NAMA_PENGIRIM_UMUM.map(nama => `<option value="${escapeHtml(nama)}">`).join('');
   resetItemRows();
 }
