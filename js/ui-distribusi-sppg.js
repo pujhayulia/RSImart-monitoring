@@ -6,10 +6,29 @@ import {
   collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
+import { KOPERASI_INFO } from './data.js';
 import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
+import { printReport } from './print-report.js';
 import { markPoTerkirim } from './ui-po-sppg.js';
+
+const LOGO_URL = 'assets/invoice/logo-koperasi.png';
+const STEMPEL_URL = 'assets/invoice/stempel-koperasi.png';
+const TTD_URL = 'assets/invoice/ttd-koperasi.jpg';
+
+/** "Dapur SPPG Sudimara Jaya" -> "Dapur_SPPG_Sudimara_Jaya" — dipakai untuk nama file unduhan (sama seperti di ui-po-sppg.js, sengaja tidak diimpor supaya kedua modul tidak saling bergantung). */
+function slugifyTujuan(tujuan) {
+  return (tujuan || 'SPPG').trim().replace(/\s+/g, '_').replace(/[\\/:*?"<>|]/g, '');
+}
+
+/** "2026-08-24" -> "24Agu2026" — dipakai untuk nama file unduhan. */
+function fileDateTag(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  const bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  return `${d}${bulan[parseInt(m, 10) - 1]}${y}`;
+}
 
 let rowCounter = 0;
 let editingId = null;
@@ -131,6 +150,110 @@ export function notaTotalNilai(nota) {
   return (nota.items || []).reduce((sum, it) => sum + (itemNilai(it) || 0), 0);
 }
 
+function nextSuratJalanNomor(year) {
+  const prefix = `SJ/${year}/`;
+  let max = 0;
+  state.lastDistribusiSppgItems.forEach(nota => {
+    if (nota.suratJalanNomor && nota.suratJalanNomor.startsWith(prefix)) {
+      const n = parseInt(nota.suratJalanNomor.slice(prefix.length), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+  });
+  return `${prefix}${String(max + 1).padStart(4, '0')}`;
+}
+
+function suratJalanHeadCompanyHtml() {
+  return `
+    <div class="invoice-head-company">
+      <img class="invoice-logo" src="${LOGO_URL}" alt="Logo ${escapeHtml(KOPERASI_INFO.namaSingkat)}">
+      <div>
+        <b>${escapeHtml(KOPERASI_INFO.nama.toUpperCase())}</b>
+        ${KOPERASI_INFO.alamatBaris.map(line => `<div class="addr">${escapeHtml(line)}</div>`).join('')}
+      </div>
+    </div>`;
+}
+
+/** Nomor surat jalan sekali dibuat lalu dipatri ke notanya (mirip pola nomor invoice di PO SPPG) — cetak ulang memakai nomor yang sama, bukan bikin baru. */
+async function cetakSuratJalan(notaId) {
+  const nota = state.lastDistribusiSppgItems.find(n => n.id === notaId);
+  if (!nota) return;
+  const tanggalSurat = nota.suratJalanTanggal || nota.tanggalKirim || todayIso();
+  const nomor = nota.suratJalanNomor || nextSuratJalanNomor(tanggalSurat.slice(0, 4));
+
+  try {
+    await updateDoc(doc(state.db, 'distribusiSppg', notaId), {
+      suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat,
+      updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
+    });
+    if (!nota.suratJalanNomor) {
+      logActivity({ action: 'ubah', modul: 'Koperasi - Distribusi SPPG', ringkasan: `Cetak Surat Jalan ${nomor} untuk ${nota.tujuanSppg}` });
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Gagal menyimpan nomor surat jalan. Cetak dibatalkan.');
+    return;
+  }
+
+  printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat });
+}
+
+function printSuratJalanBody(nota) {
+  const items = nota.items || [];
+  const rows = items.map((it, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(it.namaBarang)}</td>
+      <td style="text-align:right">${it.jumlah ?? '-'}</td>
+      <td>${escapeHtml(it.satuan || '')}</td>
+    </tr>
+  `).join('');
+
+  const body = `
+    <div class="doc-accent-blue">
+      <div class="invoice-head">
+        ${suratJalanHeadCompanyHtml()}
+        <div class="invoice-title">SURAT JALAN</div>
+      </div>
+      <div class="invoice-to-row">
+        <div class="to">Kepada: <b>${escapeHtml(nota.tujuanSppg)}</b></div>
+        <div class="meta-right">
+          <div class="row"><span class="lbl">Nomor:</span> ${escapeHtml(nota.suratJalanNomor)}</div>
+          <div class="row"><span class="lbl">Tanggal:</span> ${formatDate(nota.tanggalKirim)}${nota.jamKirim ? ', ' + escapeHtml(nota.jamKirim) : ''}</div>
+        </div>
+      </div>
+      <table class="invoice-table">
+        <thead><tr><th>No</th><th>Nama Barang</th><th>Jumlah</th><th>Satuan</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${nota.catatan ? `<div style="margin-top:12px;font-size:11.5px;"><b>Catatan:</b> ${escapeHtml(nota.catatan)}</div>` : ''}
+      <div class="invoice-signature-3col">
+        <div>
+          <div>Pengirim,</div>
+          <div class="sig-visual">
+            <img class="sig-stempel" src="${STEMPEL_URL}" alt="">
+            <img class="sig-ttd" src="${TTD_URL}" alt="">
+          </div>
+          <div class="sig-name">${escapeHtml(KOPERASI_INFO.penandaTangan)}</div>
+          <div>${escapeHtml(KOPERASI_INFO.nama)}</div>
+        </div>
+        <div>
+          <div>Penerima,</div>
+          <div class="sig-space"></div>
+          <div class="sig-name">&nbsp;</div>
+          <div>${escapeHtml(nota.tujuanSppg)}</div>
+        </div>
+        <div>
+          <div>Sopir / Pembawa,</div>
+          <div class="sig-space"></div>
+          <div class="sig-name">&nbsp;</div>
+          <div>&nbsp;</div>
+        </div>
+      </div>
+    </div>
+  `;
+  printReport(body, `SuratJalan-${slugifyTujuan(nota.tujuanSppg)}-${fileDateTag(nota.tanggalKirim)}`);
+}
+
 export function renderDistribusiSppg() {
   const logEl = document.getElementById('sppgLog');
   const notaList = filteredNota();
@@ -158,11 +281,13 @@ export function renderDistribusiSppg() {
         <div class="meta">Kirim: ${formatDate(nota.tanggalKirim)}${nota.jamKirim ? ', ' + escapeHtml(nota.jamKirim) : ''}</div>
         <div class="meta">${jumlahBarang} jenis barang${nota.catatan ? ' · ' + escapeHtml(nota.catatan) : ''}</div>
         <div class="meta">Dicatat ${formatTimestamp(nota.createdAt)}${nota.createdBy ? ' · oleh ' + escapeHtml(nota.createdBy) : ''}</div>
+        ${nota.suratJalanNomor ? `<div class="meta">Surat Jalan ${escapeHtml(nota.suratJalanNomor)}</div>` : ''}
       </div>
       <div class="right">
         ${nilai > 0 ? `<div class="dist-item-total">${formatRupiah(nilai)}</div>` : ''}
         <div class="dist-item-actions">
           <button type="button" class="btn-ghost nota-toggle-btn" data-notaid="${nota.id}">Lihat Detail</button>
+          <button type="button" class="btn-ghost nota-suratjalan-btn" data-notaid="${nota.id}">${nota.suratJalanNomor ? 'Cetak Ulang Surat Jalan' : 'Cetak Surat Jalan'}</button>
           <button class="edit-btn" data-editid="${nota.id}" title="Edit nota ini">✏️</button>
           <button class="del-btn" data-delid="${nota.id}" title="Hapus nota ini">🗑</button>
         </div>
@@ -192,6 +317,9 @@ export function renderDistribusiSppg() {
       const nowHidden = detail.classList.toggle('hidden');
       btn.textContent = nowHidden ? 'Lihat Detail' : 'Sembunyikan Detail';
     });
+  });
+  logEl.querySelectorAll('button.nota-suratjalan-btn').forEach(btn => {
+    btn.addEventListener('click', () => cetakSuratJalan(btn.dataset.notaid));
   });
   logEl.querySelectorAll('button.edit-btn').forEach(btn => {
     btn.addEventListener('click', () => {
