@@ -41,23 +41,20 @@ function isBahanKering(namaBarang) {
 }
 
 /**
- * Pengirim default satu baris barang, berdasarkan kategori bahan & tujuan SPPG:
- * - Sayur & bahan kering dari Pasar Induk -> selalu Farhan, ke SPPG manapun.
- * - Bahan lain (ayam, daging, minyak, telur, beras, dst) -> Pak Margi kalau tujuannya
- *   SPPG Meruya/Sudimara; SPPG lain (mis. Nambo) -> Ghufron, karena Margi cuma jalan ke dua itu.
+ * Pengirim default satu baris barang, berdasarkan kategori bahan — sama untuk SPPG manapun
+ * (Farhan, Pak Margi, Ghufron ketiganya bisa dipakai ke tujuan mana saja, tidak dibatasi per SPPG):
+ * - Sayur & bahan kering dari Pasar Induk -> Farhan.
+ * - Bahan lain (ayam, daging, minyak, telur, beras, dst) -> Ghufron (bisa diganti manual di form kalau ternyata Pak Margi yang kirim).
  */
-function defaultPengirimUntuk(namaBarang, tujuanSppg) {
-  if (isBahanKering(namaBarang)) return 'Farhan';
-  const t = (tujuanSppg || '').toLowerCase();
-  if (t.includes('meruya') || t.includes('sudimara')) return 'Pak Margi';
-  return KOPERASI_INFO.penandaTangan;
+function defaultPengirimUntuk(namaBarang) {
+  return isBahanKering(namaBarang) ? 'Farhan' : KOPERASI_INFO.penandaTangan;
 }
 
 /** Kelompokkan barang satu nota per pengirim default-nya — dipakai untuk pecah Surat Jalan otomatis. */
 function kelompokkanPerPengirim(nota) {
   const groups = new Map();
   (nota.items || []).forEach(it => {
-    const pengirim = defaultPengirimUntuk(it.namaBarang, nota.tujuanSppg);
+    const pengirim = defaultPengirimUntuk(it.namaBarang);
     if (!groups.has(pengirim)) groups.set(pengirim, []);
     groups.get(pengirim).push(it);
   });
