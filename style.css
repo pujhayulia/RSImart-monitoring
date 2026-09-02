@@ -354,6 +354,8 @@ select, input, button, textarea{
 }
 .nir-remove:hover{background:#FDECEC;border-color:#F3B9B9;color:#B5432E;}
 .nota-add-btn{margin-top:8px;width:100%;}
+.po-item-add-row{display:flex;gap:8px;}
+.po-item-add-row .nota-add-btn{flex:1;width:auto;}
 
 .nota-detail{
   padding:10px 18px 14px 34px;background:#F8FAFB;border-bottom:1px solid var(--line);

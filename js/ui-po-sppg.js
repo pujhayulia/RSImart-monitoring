@@ -113,6 +113,108 @@ function resetItemRows() {
   addItemRow();
 }
 
+// Alias nama kolom Excel yang dikenali (dicocokkan setelah huruf kecil & spasi/underscore dibuang) — supaya
+// pengguna tidak harus persis "Nama Barang", "nama_barang" atau "Barang" saja juga kena.
+const KOLOM_PO_EXCEL = {
+  namaBarang: ['namabarang', 'nama', 'barang', 'item', 'produk'],
+  jumlah: ['jumlah', 'qty', 'quantity', 'banyak'],
+  satuan: ['satuan', 'unit', 'uom'],
+  harga: ['harga', 'hargasatuan', 'hargarencana', 'hargasatuanrencana', 'price'],
+};
+
+function normalisasiHeaderKolom(h) {
+  return String(h || '').toLowerCase().replace(/[\s_./-]+/g, '');
+}
+
+/**
+ * Cari field internal (namaBarang/jumlah/satuan/harga) yang cocok dengan satu header kolom Excel. Dicek
+ * exact match dulu di semua field, baru substring — dan untuk substring, "harga" dicek sebelum "satuan"
+ * supaya header seperti "Harga Satuan" tidak salah kejebak ke field satuan gara-gara mengandung kata "satuan".
+ */
+function cocokkanKolomPo(header) {
+  const n = normalisasiHeaderKolom(header);
+  for (const [field, aliases] of Object.entries(KOLOM_PO_EXCEL)) {
+    if (aliases.includes(n)) return field;
+  }
+  for (const field of ['namaBarang', 'harga', 'jumlah', 'satuan']) {
+    if (KOLOM_PO_EXCEL[field].some(a => n.includes(a))) return field;
+  }
+  return null;
+}
+
+/** Baca file Excel/CSV yang dipilih dan tambahkan tiap barisnya sebagai baris barang PO — dipakai selain input manual. */
+function handleImportPoExcel(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ''; // supaya file yang sama bisa dipilih ulang lain waktu
+  if (!file) return;
+
+  if (typeof XLSX === 'undefined') {
+    alert('Pembaca file Excel belum siap dimuat. Pastikan koneksi internet aktif, lalu muat ulang halaman dan coba lagi.');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    let rows;
+    try {
+      const workbook = XLSX.read(ev.target.result, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membaca file ini. Pastikan formatnya .xlsx, .xls, atau .csv.');
+      return;
+    }
+
+    if (!rows || rows.length === 0) {
+      alert('File kosong atau tidak ada barisnya.');
+      return;
+    }
+
+    const kolomMap = {};
+    Object.keys(rows[0]).forEach(header => {
+      const field = cocokkanKolomPo(header);
+      if (field) kolomMap[field] = header;
+    });
+    if (!kolomMap.namaBarang) {
+      alert('Kolom "Nama Barang" tidak ditemukan di file ini. Pastikan ada kolom dengan header seperti "Nama Barang" atau "Barang".');
+      return;
+    }
+
+    let imported = 0, skipped = 0;
+    rows.forEach(row => {
+      const namaBarang = String(row[kolomMap.namaBarang] || '').trim();
+      if (!namaBarang) { skipped += 1; return; }
+      const jumlahRaw = kolomMap.jumlah ? row[kolomMap.jumlah] : '';
+      const satuan = kolomMap.satuan ? String(row[kolomMap.satuan] || '').trim() : '';
+      const hargaRaw = kolomMap.harga ? row[kolomMap.harga] : '';
+      addItemRow({
+        namaBarang,
+        jumlah: jumlahRaw === '' ? '' : Number(jumlahRaw),
+        satuan,
+        hargaRencana: hargaRaw === '' ? '' : Number(hargaRaw),
+      });
+      imported += 1;
+    });
+
+    // Baris kosong bawaan dari resetItemRows()/addItemRow() sebelumnya dibiarkan tetap ada supaya tidak
+    // mengejutkan kalau field-nya sudah sempat diisi manual — cuma dirapikan kalau memang masih kosong total.
+    const rowsEl = document.querySelectorAll('#poItemRows .nota-item-row');
+    if (rowsEl.length > imported) {
+      const first = rowsEl[0];
+      if (!first.querySelector('.nir-nama').value.trim()) first.remove();
+    }
+
+    if (imported > 0) {
+      alert(`${imported} barang berhasil diimpor dari file.${skipped > 0 ? ` ${skipped} baris dilewati karena nama barangnya kosong.` : ''}`);
+    } else {
+      alert('Tidak ada barang yang berhasil diimpor — periksa lagi isi filenya.');
+    }
+  };
+  reader.onerror = () => alert('Gagal membaca file. Coba lagi.');
+  reader.readAsArrayBuffer(file);
+}
+
 function readItemRows() {
   const rows = document.querySelectorAll('#poItemRows .nota-item-row');
   const items = [];
@@ -1007,6 +1109,8 @@ export function downloadLaporanPo() {
 export function initPoSppgEvents() {
   document.getElementById('btnSavePo').addEventListener('click', savePo);
   document.getElementById('btnTambahBarangPo').addEventListener('click', addItemRow);
+  document.getElementById('btnImportPoExcel').addEventListener('click', () => document.getElementById('inputImportPoExcel').click());
+  document.getElementById('inputImportPoExcel').addEventListener('change', handleImportPoExcel);
   document.getElementById('btnCancelEditPo').addEventListener('click', cancelEditPo);
   ['poFilterStatus', 'poFilterDari', 'poFilterSampai'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderPoSppg);
