@@ -227,27 +227,21 @@ function printSuratJalanBody(nota) {
       </table>
       ${nota.catatan ? `<div style="margin-top:12px;font-size:11.5px;"><b>Catatan:</b> ${escapeHtml(nota.catatan)}</div>` : ''}
       <div class="invoice-signature-3col">
-        <div>
-          <div>Pengirim,</div>
-          <div class="sig-visual">
-            <img class="sig-stempel" src="${STEMPEL_URL}" alt="">
-            <img class="sig-ttd" src="${TTD_URL}" alt="">
-          </div>
-          <div class="sig-name">${escapeHtml(KOPERASI_INFO.penandaTangan)}</div>
-          <div>${escapeHtml(KOPERASI_INFO.nama)}</div>
+        <div>Pengirim,</div>
+        <div>Penerima,</div>
+        <div>Sopir / Pembawa,</div>
+        <div class="sig-visual">
+          <img class="sig-stempel" src="${STEMPEL_URL}" alt="">
+          <img class="sig-ttd" src="${TTD_URL}" alt="">
         </div>
-        <div>
-          <div>Penerima,</div>
-          <div class="sig-space"></div>
-          <div class="sig-name">&nbsp;</div>
-          <div>${escapeHtml(nota.tujuanSppg)}</div>
-        </div>
-        <div>
-          <div>Sopir / Pembawa,</div>
-          <div class="sig-space"></div>
-          <div class="sig-name">&nbsp;</div>
-          <div>&nbsp;</div>
-        </div>
+        <div class="sig-space"></div>
+        <div class="sig-space"></div>
+        <div class="sig-name">${escapeHtml(KOPERASI_INFO.penandaTangan)}</div>
+        <div class="sig-name">&nbsp;</div>
+        <div class="sig-name">&nbsp;</div>
+        <div>${escapeHtml(KOPERASI_INFO.nama)}</div>
+        <div>${escapeHtml(nota.tujuanSppg)}</div>
+        <div>&nbsp;</div>
       </div>
     </div>
   `;

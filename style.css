@@ -596,12 +596,12 @@ footer{margin-top:56px;text-align:center;font-size:11.5px;color:var(--muted);}
   .print-report .invoice-signature-2col{display:flex;justify-content:space-between;gap:20px;margin-top:34px;font-size:11.5px;}
   .print-report .invoice-signature-2col > div{flex:1;}
   .print-report .invoice-signature-2col > div.right{text-align:right;}
-  .print-report .invoice-signature-3col{display:flex;justify-content:space-between;gap:14px;margin-top:34px;font-size:11.5px;}
-  .print-report .invoice-signature-3col > div{flex:1;min-width:0;}
-  .print-report .invoice-signature-3col .sig-visual{position:relative;height:92px;width:100%;max-width:150px;margin:6px 0 2px;}
+  .print-report .invoice-signature-3col{display:grid;grid-template-columns:repeat(3,1fr);column-gap:14px;row-gap:4px;margin-top:34px;font-size:11.5px;}
+  .print-report .invoice-signature-3col .sig-visual{position:relative;height:92px;width:100%;max-width:150px;}
   .print-report .invoice-signature-3col .sig-stempel{position:absolute;left:0;top:4px;width:62px;mix-blend-mode:multiply;}
   .print-report .invoice-signature-3col .sig-ttd{position:absolute;left:36px;top:28px;width:88px;mix-blend-mode:multiply;}
-  .print-report .invoice-signature .sig-space,.print-report .invoice-signature-2col .sig-space,.print-report .invoice-signature-3col .sig-space{height:50px;}
+  .print-report .invoice-signature .sig-space,.print-report .invoice-signature-2col .sig-space{height:50px;}
+  .print-report .invoice-signature-3col .sig-space{height:92px;}
   .print-report .invoice-signature .sig-name,.print-report .invoice-signature-2col .sig-name,.print-report .invoice-signature-3col .sig-name{font-weight:700;text-decoration:underline;}
 
   /* Varian biru untuk dokumen non-final (Konfirmasi Harga / Persetujuan Harga) — merah tetap khusus Invoice resmi */
