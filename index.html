@@ -893,6 +893,22 @@
             <button type="button" class="filter-reset" id="btnLkFilterReset">Reset</button>
           </div>
 
+          <div class="section-head section-head--sub">
+            <h3>Pengeluaran per Jenis Barang</h3>
+            <p>Ikut rentang tanggal di atas — atur tanggalnya, lalu cari nama bahan untuk lihat total jumlah yang dibeli di periode itu. Buat gambaran kebutuhan stok ke depan.</p>
+          </div>
+          <div class="date-filter-row">
+            <input type="text" id="lkCariBahan" placeholder="Cari nama bahan... (mis. minyak goreng)">
+          </div>
+          <div class="fin-panel">
+            <div class="fin-head">
+              <div>Barang</div>
+              <div>Jumlah Dibeli</div>
+              <div>Total</div>
+            </div>
+            <div id="lkBreakdownPengeluaran"></div>
+          </div>
+
           <div class="totals-row koperasi-totals koperasi-totals--3col">
             <div class="total-card">
               <div class="lbl">Total Pemasukan</div>
@@ -947,22 +963,6 @@
           </div>
 
           <div class="section-head section-head--sub">
-            <h3>Pengeluaran per Jenis Barang</h3>
-            <p>Cari nama bahan untuk lihat total jumlah yang dibeli dalam periode ini — buat gambaran kebutuhan stok ke depan.</p>
-          </div>
-          <div class="date-filter-row">
-            <input type="text" id="lkCariBahan" placeholder="Cari nama bahan... (mis. minyak goreng)">
-          </div>
-          <div class="fin-panel">
-            <div class="fin-head">
-              <div>Barang</div>
-              <div>Jumlah Dibeli</div>
-              <div>Total</div>
-            </div>
-            <div id="lkBreakdownPengeluaran"></div>
-          </div>
-
-          <div class="section-head section-head--sub">
             <h3>Pemasukan per SPPG Tujuan</h3>
           </div>
           <div class="fin-panel">
@@ -1013,6 +1013,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=19"></script>
+<script type="module" src="js/main.js?v=20"></script>
 </body>
 </html>
