@@ -24,11 +24,16 @@ const TTD_PENGIRIM = {
   'pak margi': { ttd: TTD_MARGI_URL, stempel: null },
 };
 
-// Kata kunci bahan yang dipisah ke pengirim lain (Ghufron/Margi) — cuma beras, telur, dan minyak, sesuai
-// yang biasa dikirim terpisah. Dicek sebagai substring, jadi tidak peduli huruf besar/kecil maupun variasi
-// penulisan ("Telor Puyuh", "Minyak Goreng Sunco", dst tetap kena). Di luar kata kunci ini (termasuk ayam,
-// daging, ikan, susu, dst) = dianggap kiriman Farhan.
-const KATEGORI_NONKERING_KEYWORDS = ['beras', 'telur', 'telor', 'minyak'];
+// Kata kunci bahan yang dipisah ke pengirim lain (Ghufron/Margi): beras, telur, minyak, ayam, daging,
+// tahu/tempe, dan ikan. Sayur-sayuran TIDAK termasuk — selalu tetap kiriman Farhan. Dicek sebagai substring,
+// jadi tidak peduli huruf besar/kecil maupun variasi penulisan ("Telor Puyuh", "Ayam Fillet", "Daging Sapi",
+// "Ikan Dori Fillet", dst tetap kena).
+const KATEGORI_NONKERING_KEYWORDS = [
+  'beras', 'telur', 'telor', 'minyak',
+  'ayam', 'daging', 'sapi',
+  'tahu', 'tempe',
+  'ikan', 'dori', 'patin', 'lele',
+];
 
 function isBahanKering(namaBarang) {
   const n = (namaBarang || '').toLowerCase();
@@ -38,8 +43,9 @@ function isBahanKering(namaBarang) {
 /**
  * Pengirim default satu baris barang, berdasarkan kategori bahan — sama untuk SPPG manapun
  * (Farhan, Pak Margi, Ghufron ketiganya bisa dipakai ke tujuan mana saja, tidak dibatasi per SPPG):
- * - Beras, telur, minyak -> Ghufron (bisa diganti manual di form kalau ternyata Pak Margi yang kirim).
- * - Semua bahan lain (termasuk ayam, daging, ikan, susu, dst) -> Farhan.
+ * - Beras, telur, minyak, ayam, daging, tahu/tempe, ikan -> Ghufron (bisa diganti manual di form kalau
+ *   ternyata Pak Margi yang kirim).
+ * - Sayur-sayuran & sisanya -> Farhan.
  */
 function defaultPengirimUntuk(namaBarang) {
   return isBahanKering(namaBarang) ? 'Farhan' : KOPERASI_INFO.penandaTangan;
