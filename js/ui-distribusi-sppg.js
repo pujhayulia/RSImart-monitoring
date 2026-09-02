@@ -235,7 +235,9 @@ function suratJalanFormHtml(nota) {
     <div class="po-invoice-fields">
       <label style="flex:1;min-width:240px;">
         Pengirim untuk: ${g.items.map(it => escapeHtml(it.namaBarang)).join(', ')}
-        <input type="text" list="namaPengirimList" id="suratJalanPengirim-${nota.id}-${idx}" value="${escapeHtml(g.pengirim)}">
+        <select id="suratJalanPengirim-${nota.id}-${idx}">
+          ${NAMA_PENGIRIM_UMUM.map(nama => `<option value="${escapeHtml(nama)}"${nama === g.pengirim ? ' selected' : ''}>${escapeHtml(nama)}</option>`).join('')}
+        </select>
       </label>
     </div>
   `).join('');
@@ -609,7 +611,5 @@ export function initDistribusiSppgEvents() {
   });
   document.getElementById('btnDownloadSppg').addEventListener('click', downloadLaporanDistribusiSppg);
   document.getElementById('btnCancelEditSppg').addEventListener('click', cancelEditSppg);
-  const pengirimList = document.getElementById('namaPengirimList');
-  if (pengirimList) pengirimList.innerHTML = NAMA_PENGIRIM_UMUM.map(nama => `<option value="${escapeHtml(nama)}">`).join('');
   resetItemRows();
 }
