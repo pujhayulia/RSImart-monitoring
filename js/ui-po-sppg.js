@@ -142,78 +142,228 @@ function cocokkanKolomPo(header) {
   return null;
 }
 
-/** Baca file Excel/CSV yang dipilih dan tambahkan tiap barisnya sebagai baris barang PO — dipakai selain input manual. */
-function handleImportPoExcel(e) {
+// Satuan yang dikenali saat menebak isi baris teks bebas (PDF/Word/foto) — dipakai poParseBarisTeks().
+const SATUAN_DIKENAL_TEKS = ['kg', 'gram', 'gr', 'liter', 'ltr', 'pcs', 'pc', 'ikat', 'papan', 'dus', 'karung', 'botol', 'buah', 'ekor', 'sisir', 'bungkus', 'pack', 'lembar', 'unit', 'box', 'renceng'];
+
+/**
+ * Tebak nama barang/jumlah/satuan/harga dari SATU baris teks bebas (hasil ekstraksi PDF/Word/OCR foto,
+ * yang tidak punya struktur kolom seperti Excel). Angka terakhir yang cukup besar (>=100) dianggap harga,
+ * angka lain sebelumnya dianggap jumlah, kata yang cocok daftar satuan dianggap satuan, sisanya nama barang.
+ * Ini cuma tebakan kasar — makanya hasil impor dari jenis file ini selalu perlu diperiksa manual.
+ */
+function poParseBarisTeks(line) {
+  const raw = line.trim();
+  if (!raw) return null;
+  const text = raw.replace(/^\d+[.)]\s*/, ''); // buang nomor urut di depan baris, mis. "1. " / "2) "
+  const numberRe = /\d+(?:[.,]\d+)*/g;
+  const numbers = [...text.matchAll(numberRe)];
+  if (numbers.length === 0) return null;
+
+  const parseNum = (s) => {
+    // Format ribuan ala Indonesia: tiap kelompok setelah titik/koma persis 3 digit (600.000, 1.234.567) -> hapus semua sebagai pemisah ribuan.
+    if (/^\d{1,3}(?:[.,]\d{3})+$/.test(s)) return Number(s.replace(/[.,]/g, ''));
+    // Satu pemisah yang bukan grup 3 digit (2.5, 12,75) -> anggap desimal.
+    const sepCount = (s.match(/[.,]/g) || []).length;
+    if (sepCount === 1) return Number(s.replace(',', '.'));
+    // Lebih dari satu pemisah tapi tidak rapi grup 3 digit -> pemisah terakhir dianggap desimal, sisanya dibuang.
+    const lastSep = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','));
+    if (lastSep === -1) return Number(s);
+    return Number(`${s.slice(0, lastSep).replace(/[.,]/g, '')}.${s.slice(lastSep + 1)}`);
+  };
+  const usedIdx = new Set();
+  let harga = '', jumlah = '';
+  const lastIdx = numbers.length - 1;
+  const lastVal = parseNum(numbers[lastIdx][0]);
+  if (lastVal >= 100) { harga = lastVal; usedIdx.add(lastIdx); }
+  for (let i = 0; i < numbers.length; i++) {
+    if (usedIdx.has(i)) continue;
+    jumlah = parseNum(numbers[i][0]);
+    usedIdx.add(i);
+    break;
+  }
+
+  // "5kg" (tanpa spasi) tidak kena \b antara digit & huruf -> selipkan spasi dulu biar tetap kedeteksi.
+  const lower = text.toLowerCase().replace(/(\d)([a-z])/gi, '$1 $2');
+  let satuan = '';
+  for (const s of SATUAN_DIKENAL_TEKS) {
+    if (new RegExp(`\\b${s}\\b`, 'i').test(lower)) { satuan = s; break; }
+  }
+
+  let nama = text;
+  numbers.forEach((m, i) => { if (usedIdx.has(i)) nama = nama.replace(m[0], ' '); });
+  if (satuan) nama = nama.replace(new RegExp(`\\b${satuan}\\b`, 'i'), ' ');
+  nama = nama.replace(/[|,;:@=-]+/g, ' ').replace(/\brp\b/gi, ' ').replace(/\s+/g, ' ').trim();
+  if (!nama) return null;
+
+  return { namaBarang: nama, jumlah, satuan, harga };
+}
+
+/** Pecah blok teks bebas jadi baris-baris barang (dipakai untuk hasil ekstraksi PDF/Word/OCR foto). */
+function poTeksKeBaris(text) {
+  return text.split(/\r?\n/).map(poParseBarisTeks).filter(Boolean);
+}
+
+/** Ekstrak teks dari file PDF halaman per halaman lewat pdf.js, disusun ulang jadi baris berdasarkan posisi Y tiap potongan teks. */
+async function poEkstrakTeksPdf(arrayBuffer) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const semuaBaris = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    let lastY = null, baris = '';
+    content.items.forEach(item => {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 2) {
+        semuaBaris.push(baris.trim());
+        baris = '';
+      }
+      baris += item.str + ' ';
+      lastY = y;
+    });
+    if (baris.trim()) semuaBaris.push(baris.trim());
+  }
+  return semuaBaris.join('\n');
+}
+
+/** Ekstrak barang dari file Word (.docx) — coba baca tabel dulu (paling akurat), kalau tidak ada tabel baru pakai teks per baris. */
+async function poEkstrakBarisDocx(arrayBuffer) {
+  const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+  const doc = new DOMParser().parseFromString(htmlResult.value, 'text/html');
+  const table = doc.querySelector('table');
+  if (table) {
+    const trs = Array.from(table.querySelectorAll('tr'));
+    if (trs.length > 0) {
+      const headerCells = Array.from(trs[0].querySelectorAll('th,td')).map(td => td.textContent.trim());
+      const kolomMap = {};
+      headerCells.forEach((h, idx) => {
+        const field = cocokkanKolomPo(h);
+        if (field && kolomMap[field] === undefined) kolomMap[field] = idx;
+      });
+      const rows = [];
+      const dataTrs = kolomMap.namaBarang !== undefined ? trs.slice(1) : trs;
+      const idxNama = kolomMap.namaBarang !== undefined ? kolomMap.namaBarang : 0;
+      dataTrs.forEach(tr => {
+        const cells = Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim());
+        const namaBarang = cells[idxNama] || '';
+        if (!namaBarang) return;
+        rows.push({
+          namaBarang,
+          jumlah: kolomMap.jumlah !== undefined ? cells[kolomMap.jumlah] || '' : (cells[1] || ''),
+          satuan: kolomMap.satuan !== undefined ? cells[kolomMap.satuan] || '' : (cells[2] || ''),
+          harga: kolomMap.harga !== undefined ? cells[kolomMap.harga] || '' : (cells[3] || ''),
+        });
+      });
+      if (rows.length > 0) return rows;
+    }
+  }
+  const rawText = await mammoth.extractRawText({ arrayBuffer });
+  return poTeksKeBaris(rawText.value);
+}
+
+/** OCR foto/scan (JPG/PNG) lewat Tesseract.js — paling lambat & paling tidak akurat dari semua jenis file yang didukung. */
+async function poEkstrakTeksGambar(file, onProgress) {
+  const { data } = await Tesseract.recognize(file, 'eng', {
+    logger: onProgress,
+  });
+  return data.text;
+}
+
+const EKSTENSI_EXCEL = ['xlsx', 'xls', 'xlsm', 'ods', 'csv', 'xlsb'];
+
+function poBacaBarisExcel(arrayBuffer) {
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  if (rawRows.length === 0) throw new Error('File kosong atau tidak ada barisnya.');
+
+  const kolomMap = {};
+  Object.keys(rawRows[0]).forEach(header => {
+    const field = cocokkanKolomPo(header);
+    if (field) kolomMap[field] = header;
+  });
+  if (!kolomMap.namaBarang) {
+    const headerAsli = Object.keys(rawRows[0]).join(', ');
+    throw new Error(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", atau "Bahan".`);
+  }
+
+  return rawRows
+    .map(row => ({
+      namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
+      jumlah: kolomMap.jumlah ? row[kolomMap.jumlah] : '',
+      satuan: kolomMap.satuan ? String(row[kolomMap.satuan] || '').trim() : '',
+      harga: kolomMap.harga ? row[kolomMap.harga] : '',
+    }))
+    .filter(r => r.namaBarang);
+}
+
+/** Baca file yang dipilih (Excel/CSV, PDF, Word, atau foto JPG/PNG) dan tambahkan tiap barisnya sebagai baris barang PO — dipakai selain input manual. */
+async function handleImportPoExcel(e) {
   const file = e.target.files && e.target.files[0];
   e.target.value = ''; // supaya file yang sama bisa dipilih ulang lain waktu
   if (!file) return;
 
-  if (typeof XLSX === 'undefined') {
-    alert('Pembaca file Excel belum siap dimuat. Pastikan koneksi internet aktif, lalu muat ulang halaman dan coba lagi.');
-    return;
-  }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const btn = document.getElementById('btnImportPoExcel');
+  const labelAsli = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Membaca file...'; }
 
-  const reader = new FileReader();
-  reader.onload = (ev) => {
+  try {
     let rows;
-    try {
-      const workbook = XLSX.read(ev.target.result, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    } catch (err) {
-      console.error(err);
-      alert('Gagal membaca file ini. Pastikan formatnya .xlsx, .xls, atau .csv.');
-      return;
+    let butuhPeriksaManual = false;
+
+    if (EKSTENSI_EXCEL.includes(ext)) {
+      if (typeof XLSX === 'undefined') throw new Error('Pembaca Excel belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
+      rows = poBacaBarisExcel(await file.arrayBuffer());
+    } else if (ext === 'pdf') {
+      if (typeof pdfjsLib === 'undefined') throw new Error('Pembaca PDF belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
+      if (btn) btn.textContent = 'Membaca PDF...';
+      rows = poTeksKeBaris(await poEkstrakTeksPdf(await file.arrayBuffer()));
+      butuhPeriksaManual = true;
+    } else if (ext === 'doc' || ext === 'docx') {
+      if (typeof mammoth === 'undefined') throw new Error('Pembaca Word belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
+      if (btn) btn.textContent = 'Membaca dokumen Word...';
+      rows = await poEkstrakBarisDocx(await file.arrayBuffer());
+      butuhPeriksaManual = true;
+    } else if (['jpg', 'jpeg', 'png'].includes(ext)) {
+      if (typeof Tesseract === 'undefined') throw new Error('Pembaca gambar (OCR) belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
+      const teks = await poEkstrakTeksGambar(file, (m) => {
+        if (btn && m.status === 'recognizing text') btn.textContent = `Membaca gambar... ${Math.round((m.progress || 0) * 100)}%`;
+      });
+      rows = poTeksKeBaris(teks);
+      butuhPeriksaManual = true;
+    } else {
+      throw new Error(`Jenis file ".${ext}" belum didukung. Coba file Excel/CSV, PDF, Word (.docx), atau foto (JPG/PNG).`);
     }
 
     if (!rows || rows.length === 0) {
-      alert('File kosong atau tidak ada barisnya.');
-      return;
+      throw new Error('Tidak ada barang yang berhasil terbaca dari file ini. Coba file lain, atau isi manual.');
     }
 
-    const kolomMap = {};
-    Object.keys(rows[0]).forEach(header => {
-      const field = cocokkanKolomPo(header);
-      if (field) kolomMap[field] = header;
-    });
-    if (!kolomMap.namaBarang) {
-      const headerAsli = Object.keys(rows[0]).join(', ');
-      alert(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", atau "Bahan".`);
-      return;
-    }
-
-    let imported = 0, skipped = 0;
-    rows.forEach(row => {
-      const namaBarang = String(row[kolomMap.namaBarang] || '').trim();
-      if (!namaBarang) { skipped += 1; return; }
-      const jumlahRaw = kolomMap.jumlah ? row[kolomMap.jumlah] : '';
-      const satuan = kolomMap.satuan ? String(row[kolomMap.satuan] || '').trim() : '';
-      const hargaRaw = kolomMap.harga ? row[kolomMap.harga] : '';
+    rows.forEach(r => {
       addItemRow({
-        namaBarang,
-        jumlah: jumlahRaw === '' ? '' : Number(jumlahRaw),
-        satuan,
-        hargaRencana: hargaRaw === '' ? '' : Number(hargaRaw),
+        namaBarang: r.namaBarang,
+        jumlah: r.jumlah === '' || r.jumlah === undefined ? '' : Number(r.jumlah),
+        satuan: r.satuan || '',
+        hargaRencana: r.harga === '' || r.harga === undefined ? '' : Number(r.harga),
       });
-      imported += 1;
     });
 
     // Baris kosong bawaan dari resetItemRows()/addItemRow() sebelumnya dibiarkan tetap ada supaya tidak
     // mengejutkan kalau field-nya sudah sempat diisi manual — cuma dirapikan kalau memang masih kosong total.
     const rowsEl = document.querySelectorAll('#poItemRows .nota-item-row');
-    if (rowsEl.length > imported) {
+    if (rowsEl.length > rows.length) {
       const first = rowsEl[0];
       if (!first.querySelector('.nir-nama').value.trim()) first.remove();
     }
 
-    if (imported > 0) {
-      alert(`${imported} barang berhasil diimpor dari file.${skipped > 0 ? ` ${skipped} baris dilewati karena nama barangnya kosong.` : ''}`);
-    } else {
-      alert('Tidak ada barang yang berhasil diimpor — periksa lagi isi filenya.');
-    }
-  };
-  reader.onerror = () => alert('Gagal membaca file. Coba lagi.');
-  reader.readAsArrayBuffer(file);
+    alert(`${rows.length} barang berhasil diimpor dari file.${butuhPeriksaManual ? '\n\nJenis file ini dibaca otomatis dari teks/gambar (bukan tabel Excel), jadi bisa saja ada yang salah baca — mohon PERIKSA ULANG tiap baris (nama, jumlah, satuan, harga) sebelum klik Simpan PO.' : ''}`);
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Gagal membaca file ini.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = labelAsli || '📄 Impor dari File'; }
+  }
 }
 
 function readItemRows() {
