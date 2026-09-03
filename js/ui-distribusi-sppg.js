@@ -196,6 +196,19 @@ export function notaTotalNilai(nota) {
   return (nota.items || []).reduce((sum, it) => sum + (itemNilai(it) || 0), 0);
 }
 
+/**
+ * Label jam kirim untuk ditampilkan — satu nota bisa dikirim dua kelompok di jam berbeda (Farhan untuk
+ * sayur/kering, Ghufron/Margi untuk sisanya), jadi keduanya ditampilkan kalau memang diisi. Nota lama yang
+ * cuma punya satu `jamKirim` (sebelum field ini dipecah) tetap tampil apa adanya sebagai penyeimbang.
+ */
+export function jamKirimLabel(nota) {
+  const parts = [];
+  if (nota.jamKirimKering) parts.push(`Sayur/Kering ${nota.jamKirimKering}`);
+  if (nota.jamKirimLainnya) parts.push(`Lainnya ${nota.jamKirimLainnya}`);
+  if (parts.length > 0) return parts.join(' · ');
+  return nota.jamKirim || '';
+}
+
 const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const BULAN_NAMA = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const HARI_NAMA = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -423,7 +436,7 @@ export function renderDistribusiSppg() {
     <div class="dist-item">
       <div class="left">
         <b>${escapeHtml(nota.tujuanSppg)}</b>
-        <div class="meta">Kirim: ${formatDate(nota.tanggalKirim)}${nota.jamKirim ? ', ' + escapeHtml(nota.jamKirim) : ''}</div>
+        <div class="meta">Kirim: ${formatDate(nota.tanggalKirim)}${jamKirimLabel(nota) ? ', ' + escapeHtml(jamKirimLabel(nota)) : ''}</div>
         <div class="meta">${jumlahBarang} jenis barang${nota.catatan ? ' · ' + escapeHtml(nota.catatan) : ''}</div>
         <div class="meta">Dicatat ${formatTimestamp(nota.createdAt)}${nota.createdBy ? ' · oleh ' + escapeHtml(nota.createdBy) : ''}</div>
         ${nota.suratJalanNomor ? `<div class="meta">Surat Jalan ${escapeHtml(nota.suratJalanNomor)}</div>` : ''}
@@ -484,7 +497,9 @@ export function renderDistribusiSppg() {
 function startEditSppg(nota) {
   editingId = nota.id;
   document.getElementById('sppgTanggalKirim').value = nota.tanggalKirim || '';
-  document.getElementById('sppgJamKirim').value = nota.jamKirim || '';
+  // Nota lama (sebelum field ini dipecah dua) cuma punya `jamKirim` tunggal — taruh di kolom "kering" sebagai tebakan terbaik, biar tidak hilang begitu diedit.
+  document.getElementById('sppgJamKirimKering').value = nota.jamKirimKering || nota.jamKirim || '';
+  document.getElementById('sppgJamKirimLainnya').value = nota.jamKirimLainnya || '';
   document.getElementById('sppgTujuan').value = nota.tujuanSppg || '';
   document.getElementById('sppgCatatan').value = nota.catatan || '';
 
@@ -517,7 +532,8 @@ export function prefillFromPo(po) {
   editingId = null;
   linkedPoId = po.id;
   document.getElementById('sppgTanggalKirim').value = todayIso();
-  document.getElementById('sppgJamKirim').value = '';
+  document.getElementById('sppgJamKirimKering').value = '';
+  document.getElementById('sppgJamKirimLainnya').value = '';
   document.getElementById('sppgTujuan').value = po.tujuanSppg || '';
   document.getElementById('sppgCatatan').value = `Dari PO ${formatDate(po.tanggalPo)}${po.catatan ? ' — ' + po.catatan : ''}`;
 
@@ -559,7 +575,8 @@ async function deleteDistribusiSppg(id) {
 
 export async function saveDistribusiSppg() {
   const tanggalKirim = document.getElementById('sppgTanggalKirim').value;
-  const jamKirim = document.getElementById('sppgJamKirim').value;
+  const jamKirimKering = document.getElementById('sppgJamKirimKering').value;
+  const jamKirimLainnya = document.getElementById('sppgJamKirimLainnya').value;
   const tujuanSppg = document.getElementById('sppgTujuan').value.trim();
   const catatan = document.getElementById('sppgCatatan').value.trim();
   const items = readItemRows();
@@ -573,7 +590,7 @@ export async function saveDistribusiSppg() {
     return;
   }
 
-  const entry = { tanggalKirim, jamKirim, tujuanSppg, catatan, items };
+  const entry = { tanggalKirim, jamKirimKering, jamKirimLainnya, tujuanSppg, catatan, items };
   const isEdit = !!editingId;
   if (isEdit) {
     entry.updatedAt = serverTimestamp();
@@ -630,12 +647,12 @@ export function downloadLaporanDistribusiSppg() {
     return;
   }
 
-  const headers = ['Tanggal Kirim', 'Jam Kirim', 'Tujuan SPPG', 'Catatan Nota', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga Satuan Jual (Rp)', 'Subtotal (Rp)', 'Diinput Oleh', 'Dicatat Pada'];
+  const headers = ['Tanggal Kirim', 'Jam Kirim (Sayur/Kering)', 'Jam Kirim (Lainnya)', 'Tujuan SPPG', 'Catatan Nota', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga Satuan Jual (Rp)', 'Subtotal (Rp)', 'Diinput Oleh', 'Dicatat Pada'];
   const rows = [];
   notaList.forEach(nota => {
     (nota.items || []).forEach(item => {
       rows.push([
-        formatDate(nota.tanggalKirim), nota.jamKirim || '', nota.tujuanSppg, nota.catatan || '',
+        formatDate(nota.tanggalKirim), nota.jamKirimKering || (nota.jamKirimLainnya ? '' : nota.jamKirim) || '', nota.jamKirimLainnya || '', nota.tujuanSppg, nota.catatan || '',
         item.namaBarang, item.jumlah ?? '', item.satuan || '', item.hargaJual ?? '', itemNilai(item) ?? '',
         nota.createdBy || '', formatTimestamp(nota.createdAt),
       ]);

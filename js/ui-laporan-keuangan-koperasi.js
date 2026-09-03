@@ -4,7 +4,7 @@
 // supaya angkanya selalu konsisten di kedua tempat.
 import { state } from './state.js';
 import { formatRupiah, formatDate, isDateStrInRange, escapeHtml, monthRange } from './utils.js';
-import { notaInRange, flattenItems, itemNilai, notaTotalNilai } from './ui-distribusi-sppg.js';
+import { notaInRange, flattenItems, itemNilai, notaTotalNilai, jamKirimLabel } from './ui-distribusi-sppg.js';
 import { computeMarginKotor } from './ui-po-sppg.js';
 import { biayaOperasionalInRange } from './ui-biaya-operasional.js';
 import { pembelianTanggalIso } from './ui-pembelian.js';
@@ -57,7 +57,7 @@ function buildLedger(data) {
   data.notaList.forEach(nota => {
     ledger.push({
       tanggalSort: nota.tanggalKirim,
-      tanggalDisplay: formatDate(nota.tanggalKirim) + (nota.jamKirim ? ', ' + nota.jamKirim : ''),
+      tanggalDisplay: formatDate(nota.tanggalKirim) + (jamKirimLabel(nota) ? ', ' + jamKirimLabel(nota) : ''),
       keterangan: `Distribusi - Nota ke ${nota.tujuanSppg} (${(nota.items || []).length} jenis barang)`,
       jenis: 'Pemasukan',
       jumlah: notaTotalNilai(nota),
