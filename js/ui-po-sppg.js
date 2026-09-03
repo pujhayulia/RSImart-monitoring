@@ -116,8 +116,8 @@ function resetItemRows() {
 // Alias nama kolom Excel yang dikenali (dicocokkan setelah huruf kecil & spasi/underscore dibuang) — supaya
 // pengguna tidak harus persis "Nama Barang", "nama_barang" atau "Barang" saja juga kena.
 const KOLOM_PO_EXCEL = {
-  namaBarang: ['namabarang', 'nama', 'barang', 'item', 'produk'],
-  jumlah: ['jumlah', 'qty', 'quantity', 'banyak'],
+  namaBarang: ['namabarang', 'namabahan', 'nama', 'barang', 'bahan', 'item', 'produk', 'deskripsi'],
+  jumlah: ['jumlah', 'qty', 'quantity', 'banyak', 'qtypesan'],
   satuan: ['satuan', 'unit', 'uom'],
   harga: ['harga', 'hargasatuan', 'hargarencana', 'hargasatuanrencana', 'price'],
 };
@@ -177,7 +177,8 @@ function handleImportPoExcel(e) {
       if (field) kolomMap[field] = header;
     });
     if (!kolomMap.namaBarang) {
-      alert('Kolom "Nama Barang" tidak ditemukan di file ini. Pastikan ada kolom dengan header seperti "Nama Barang" atau "Barang".');
+      const headerAsli = Object.keys(rows[0]).join(', ');
+      alert(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", atau "Bahan".`);
       return;
     }
 
