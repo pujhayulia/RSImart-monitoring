@@ -186,11 +186,12 @@ function filteredPembelian() {
   return state.lastPembelianItems.filter(it => isDateStrInRange(pembelianTanggalIso(it), dari, sampai));
 }
 
-/** Total belanja & jumlah transaksi dari SELURUH data yang sudah termuat (tanpa filter tanggal) — dipakai di Beranda Koperasi. */
-export function computePembelianSummary() {
+/** Total belanja & jumlah transaksi dalam rentang tanggal (kosongkan dari/sampai untuk semua data) — dipakai di Beranda Koperasi. */
+export function computePembelianSummary(dari, sampai) {
+  const items = (!dari && !sampai) ? state.lastPembelianItems : state.lastPembelianItems.filter(it => isDateStrInRange(pembelianTanggalIso(it), dari, sampai));
   let totalBelanja = 0;
-  state.lastPembelianItems.forEach(it => { totalBelanja += typeof it.harga === 'number' ? it.harga : 0; });
-  return { totalBelanja, jumlahTransaksi: state.lastPembelianItems.length };
+  items.forEach(it => { totalBelanja += typeof it.harga === 'number' ? it.harga : 0; });
+  return { totalBelanja, jumlahTransaksi: items.length };
 }
 
 /** Isi ulang datalist "Nama Toko" dari nama-nama toko unik yang pernah dipakai — tanpa collection Firestore terpisah. */

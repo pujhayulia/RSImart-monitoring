@@ -183,9 +183,9 @@ export function itemNilai(it) {
   return it.hargaJual * jumlah;
 }
 
-/** Total nilai & jumlah barang dari SELURUH nota yang sudah termuat (tanpa filter tanggal) — dipakai di Beranda Koperasi. */
-export function computeDistribusiSppgSummary() {
-  const items = flattenItems(state.lastDistribusiSppgItems);
+/** Total nilai & jumlah barang dalam rentang tanggal (kosongkan dari/sampai untuk semua data) — dipakai di Beranda Koperasi. */
+export function computeDistribusiSppgSummary(dari, sampai) {
+  const items = flattenItems(notaInRange(dari, sampai));
   let totalNilai = 0;
   items.forEach(it => { totalNilai += itemNilai(it) || 0; });
   return { totalNilai, jumlahItem: items.length };

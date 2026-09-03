@@ -495,6 +495,17 @@
           </div>
           <div class="action-needed-row" id="berandaKopActionRow"></div>
 
+          <div class="section-head section-head--sub">
+            <h3>Ringkasan Bulan Ini</h3>
+            <p>Default menampilkan bulan berjalan — atur rentang tanggalnya untuk cari periode lain, atau klik Reset untuk lihat seluruh data. Berlaku untuk semua kartu di bawah ini.</p>
+          </div>
+          <div class="date-filter-row">
+            <input type="date" id="kopKeuanganFilterDari" aria-label="Dari tanggal">
+            <span class="date-filter-sep">–</span>
+            <input type="date" id="kopKeuanganFilterSampai" aria-label="Sampai tanggal">
+            <button type="button" class="filter-reset" id="btnKopKeuanganFilterReset">Reset</button>
+          </div>
+
           <div class="totals-row">
             <div class="total-card">
               <div class="lbl">Total Pengeluaran Pembelian</div>
@@ -516,13 +527,7 @@
 
           <div class="section-head section-head--sub">
             <h3>Ringkasan Keuangan Koperasi</h3>
-            <p>Total pengeluaran (Pembelian), pemasukan (Distribusi ke SPPG), dan saldo — bisa difilter per tanggal.</p>
-          </div>
-          <div class="date-filter-row">
-            <input type="date" id="kopKeuanganFilterDari" aria-label="Dari tanggal">
-            <span class="date-filter-sep">–</span>
-            <input type="date" id="kopKeuanganFilterSampai" aria-label="Sampai tanggal">
-            <button type="button" class="filter-reset" id="btnKopKeuanganFilterReset">Reset</button>
+            <p>Total pengeluaran (Pembelian), pemasukan (Distribusi ke SPPG), dan saldo.</p>
           </div>
           <div class="totals-row koperasi-totals koperasi-totals--3col" id="kopKeuanganCards">
             <div class="total-card amber">
@@ -1004,6 +1009,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=32"></script>
+<script type="module" src="js/main.js?v=33"></script>
 </body>
 </html>

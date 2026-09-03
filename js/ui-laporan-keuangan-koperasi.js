@@ -134,16 +134,6 @@ export function renderRingkasanKeuanganKoperasi() {
   profitCard.classList.toggle('alt', data.profitReal >= 0);
 }
 
-export function initRingkasanKeuanganKoperasiEvents() {
-  document.getElementById('kopKeuanganFilterDari').addEventListener('change', renderRingkasanKeuanganKoperasi);
-  document.getElementById('kopKeuanganFilterSampai').addEventListener('change', renderRingkasanKeuanganKoperasi);
-  document.getElementById('btnKopKeuanganFilterReset').addEventListener('click', () => {
-    document.getElementById('kopKeuanganFilterDari').value = '';
-    document.getElementById('kopKeuanganFilterSampai').value = '';
-    renderRingkasanKeuanganKoperasi();
-  });
-}
-
 // ---------- Halaman penuh: Laporan Keuangan Koperasi (Bagian D) ----------
 export function renderLaporanKeuanganKoperasi() {
   const totalPemasukanEl = document.getElementById('lkTotalPemasukan');
