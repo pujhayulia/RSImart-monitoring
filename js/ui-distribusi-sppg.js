@@ -233,21 +233,29 @@ function toggleSuratJalanForm(notaId) {
 function suratJalanFormHtml(nota) {
   const groups = kelompokkanPerPengirim(nota);
   const groupsHtml = groups.map((g, idx) => `
-    <div class="po-invoice-fields">
-      <label style="flex:1;min-width:240px;">
-        Pengirim untuk: ${g.items.map(it => escapeHtml(it.namaBarang)).join(', ')}
-        <select id="suratJalanPengirim-${nota.id}-${idx}">
-          ${NAMA_PENGIRIM_UMUM.map(nama => `<option value="${escapeHtml(nama)}"${nama === g.pengirim ? ' selected' : ''}>${escapeHtml(nama)}</option>`).join('')}
-        </select>
-      </label>
+    <div class="surat-jalan-group">
+      <div class="po-invoice-fields">
+        <label style="flex:1;min-width:240px;">
+          Pengirim
+          <select id="suratJalanPengirim-${nota.id}-${idx}">
+            ${NAMA_PENGIRIM_UMUM.map(nama => `<option value="${escapeHtml(nama)}"${nama === g.pengirim ? ' selected' : ''}>${escapeHtml(nama)}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <div class="surat-jalan-item-checklist">
+        ${g.items.map((it, itemIdx) => `
+          <label class="surat-jalan-item-check">
+            <input type="checkbox" checked data-suratjalan-item="${nota.id}-${idx}-${itemIdx}">
+            <span>${escapeHtml(it.namaBarang)} — ${it.jumlah ?? '-'} ${escapeHtml(it.satuan || '')}</span>
+          </label>
+        `).join('')}
+      </div>
     </div>
   `).join('');
   const label = groups.length > 1 ? `Cetak ${groups.length} Surat Jalan` : 'Cetak Surat Jalan';
   return `
     <div class="po-inline-form" data-suratjalan-form="${nota.id}">
-      <h4>${groups.length > 1
-        ? `Barang di nota ini dipecah jadi ${groups.length} Surat Jalan berdasarkan asal &amp; pengirimnya:`
-        : 'Siapa yang mengantar barang ini?'}</h4>
+      <h4>Centang barang yang mau dimasukkan ke Surat Jalan${groups.length > 1 ? `, dipecah otomatis jadi ${groups.length} kelompok pengirim` : ''}:</h4>
       ${groupsHtml}
       <div class="po-inline-form-actions">
         <button type="button" class="btn-ghost" data-suratjalan-cancel="${nota.id}">Batal</button>
@@ -267,8 +275,18 @@ async function submitSuratJalan(notaId) {
   const groups = kelompokkanPerPengirim(nota).map((g, idx) => {
     const input = document.getElementById(`suratJalanPengirim-${notaId}-${idx}`);
     const pengirim = (input ? input.value.trim() : '') || g.pengirim;
-    return { pengirim, items: g.items };
-  });
+    const items = g.items.filter((it, itemIdx) => {
+      const cb = document.querySelector(`[data-suratjalan-item="${notaId}-${idx}-${itemIdx}"]`);
+      return cb ? cb.checked : true;
+    });
+    return { pengirim, items };
+  }).filter(g => g.items.length > 0);
+
+  if (groups.length === 0) {
+    alert('Pilih minimal satu barang untuk dicetak.');
+    return;
+  }
+
   const tanggalSurat = nota.suratJalanTanggal || nota.tanggalKirim || todayIso();
   const nomor = nota.suratJalanNomor || nextSuratJalanNomor(tanggalSurat.slice(0, 4));
   const pengirimGabungan = groups.map(g => g.pengirim).join(', ');
