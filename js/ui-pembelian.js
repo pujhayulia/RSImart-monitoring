@@ -5,7 +5,7 @@ import {
   collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
-import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, timestampToLocalDateIso, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, timestampToLocalDateIso, escapeHtml, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
@@ -425,6 +425,9 @@ export function downloadLaporanPembelian() {
 export function initPembelianEvents() {
   document.getElementById('btnSavePembelian').addEventListener('click', savePembelian);
   document.getElementById('btnTambahBarangPembelian').addEventListener('click', () => addItemRow());
+  const { dari, sampai } = monthRange();
+  document.getElementById('pembelianFilterDari').value = dari;
+  document.getElementById('pembelianFilterSampai').value = sampai;
   document.getElementById('pembelianFilterDari').addEventListener('change', renderPembelian);
   document.getElementById('pembelianFilterSampai').addEventListener('change', renderPembelian);
   document.getElementById('btnPembelianFilterReset').addEventListener('click', () => {

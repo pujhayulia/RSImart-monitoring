@@ -6,7 +6,7 @@ import {
   collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
-import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
@@ -207,6 +207,9 @@ export function downloadLaporanBiayaOperasional() {
 
 export function initBiayaOperasionalEvents() {
   document.getElementById('btnSaveBiayaOp').addEventListener('click', saveBiayaOperasional);
+  const { dari, sampai } = monthRange();
+  document.getElementById('biayaOpFilterDari').value = dari;
+  document.getElementById('biayaOpFilterSampai').value = sampai;
   document.getElementById('biayaOpFilterDari').addEventListener('change', renderBiayaOperasional);
   document.getElementById('biayaOpFilterSampai').addEventListener('change', renderBiayaOperasional);
   document.getElementById('btnBiayaOpFilterReset').addEventListener('click', () => {

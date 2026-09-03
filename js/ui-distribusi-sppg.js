@@ -7,7 +7,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
 import { KOPERASI_INFO } from './data.js';
-import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso } from './utils.js';
+import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 import { printReport } from './print-report.js';
@@ -621,6 +621,9 @@ export function downloadLaporanDistribusiSppg() {
 export function initDistribusiSppgEvents() {
   document.getElementById('btnSaveSppg').addEventListener('click', saveDistribusiSppg);
   document.getElementById('btnTambahBarangSppg').addEventListener('click', addItemRow);
+  const { dari, sampai } = monthRange();
+  document.getElementById('sppgFilterDari').value = dari;
+  document.getElementById('sppgFilterSampai').value = sampai;
   document.getElementById('sppgFilterDari').addEventListener('change', renderDistribusiSppg);
   document.getElementById('sppgFilterSampai').addEventListener('change', renderDistribusiSppg);
   document.getElementById('btnSppgFilterReset').addEventListener('click', () => {

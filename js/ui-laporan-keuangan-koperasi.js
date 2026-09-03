@@ -3,7 +3,7 @@
 // widget ringkasan di Beranda Koperasi maupun halaman Laporan Keuangan Koperasi ini,
 // supaya angkanya selalu konsisten di kedua tempat.
 import { state } from './state.js';
-import { formatRupiah, formatDate, isDateStrInRange, escapeHtml } from './utils.js';
+import { formatRupiah, formatDate, isDateStrInRange, escapeHtml, monthRange } from './utils.js';
 import { notaInRange, flattenItems, itemNilai, notaTotalNilai } from './ui-distribusi-sppg.js';
 import { computeMarginKotor } from './ui-po-sppg.js';
 import { biayaOperasionalInRange } from './ui-biaya-operasional.js';
@@ -248,6 +248,9 @@ export function downloadLaporanKeuanganPdf() {
 }
 
 export function initLaporanKeuanganKoperasiEvents() {
+  const { dari, sampai } = monthRange();
+  document.getElementById('lkFilterDari').value = dari;
+  document.getElementById('lkFilterSampai').value = sampai;
   document.getElementById('lkFilterDari').addEventListener('change', renderLaporanKeuanganKoperasi);
   document.getElementById('lkFilterSampai').addEventListener('change', renderLaporanKeuanganKoperasi);
   document.getElementById('lkCariBahan').addEventListener('input', renderLaporanKeuanganKoperasi);
