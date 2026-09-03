@@ -2,16 +2,17 @@
 // Satu barang yang dibeli = satu dokumen di collection "pembelianBahanMakanan",
 // terpisah dari modul Stok Gudang RSI ("rekap"/"pengiriman"/"lokasi").
 import {
-  collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
+  collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
 import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, timestampToLocalDateIso, escapeHtml } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 
-const FIELD_IDS = ['NamaToko', 'NoHp', 'AlamatToko', 'NamaPembeli', 'NamaBarang', 'Jumlah', 'Satuan', 'Harga', 'Catatan'];
+const FIELD_IDS = ['NamaToko', 'NoHp', 'AlamatToko', 'NamaPembeli', 'Catatan'];
 
 let editingId = null;
+let rowCounter = 0;
 
 /** Kunci stabil satu baris barang PO (sama dengan poItemKey() di ui-po-sppg.js, sengaja tidak diimpor supaya kedua modul tidak saling bergantung). */
 function poItemKeyLocal(item, index) {
@@ -34,23 +35,24 @@ export function refreshPoOptions() {
   sel.innerHTML = '<option value="">— Tidak dikaitkan ke PO —</option>' +
     open.map(po => `<option value="${po.id}">${escapeHtml(po.tujuanSppg)} — ${formatDate(po.tanggalPo)}</option>`).join('');
   sel.value = open.some(po => po.id === current) ? current : '';
-  populatePoItemSelect();
+  refreshAllRowPoItemSelects();
 }
 
-function populatePoItemSelect() {
-  const poSel = document.getElementById('pembelianPoId');
-  const itemSel = document.getElementById('pembelianPoItem');
-  if (!poSel || !itemSel) return;
+/** Isi ulang pilihan "Untuk barang PO ini" di SATU baris barang, berdasarkan PO yang sedang dikaitkan (kalau ada). */
+function populateRowPoItemSelect(row) {
+  const itemSel = row.querySelector('.nir-poitem');
+  if (!itemSel) return;
   const current = itemSel.value;
-  const po = (state.lastPoSppgItems || []).find(p => p.id === poSel.value);
+  const poId = document.getElementById('pembelianPoId').value;
+  const po = (state.lastPoSppgItems || []).find(p => p.id === poId);
   if (!po) {
-    itemSel.innerHTML = '<option value="">—</option>';
-    itemSel.disabled = true;
+    itemSel.innerHTML = '<option value="">— Tidak dikaitkan ke barang PO tertentu —</option>';
+    itemSel.classList.add('hidden');
     return;
   }
-  itemSel.disabled = false;
+  itemSel.classList.remove('hidden');
   const items = po.items || [];
-  itemSel.innerHTML = items.map((it, idx) => {
+  itemSel.innerHTML = '<option value="">— Untuk barang PO yang mana? —</option>' + items.map((it, idx) => {
     const key = poItemKeyLocal(it, idx);
     const jumlahOrder = typeof it.jumlah === 'number' ? it.jumlah : 0;
     const dibeli = jumlahDibeliUntukPoItem(po.id, key, editingId);
@@ -61,16 +63,80 @@ function populatePoItemSelect() {
   if (items.some((it, idx) => poItemKeyLocal(it, idx) === current)) itemSel.value = current;
 }
 
-function applyPoItemToForm() {
-  const poSel = document.getElementById('pembelianPoId');
-  const itemSel = document.getElementById('pembelianPoItem');
-  const po = (state.lastPoSppgItems || []).find(p => p.id === poSel.value);
-  if (!po) return;
+/** Isi ulang pilihan "Untuk barang PO ini" di SEMUA baris barang yang sedang ditampilkan. */
+function refreshAllRowPoItemSelects() {
+  document.querySelectorAll('#pembelianItemRows .nota-item-row').forEach(populateRowPoItemSelect);
+}
+
+/** Saat "Untuk barang PO ini" dipilih di satu baris, isi otomatis nama barang & satuannya dari PO. */
+function applyPoItemToRow(row) {
+  const itemSel = row.querySelector('.nir-poitem');
+  const po = (state.lastPoSppgItems || []).find(p => p.id === document.getElementById('pembelianPoId').value);
+  if (!po || !itemSel) return;
   const idx = (po.items || []).findIndex((it, i) => poItemKeyLocal(it, i) === itemSel.value);
   if (idx === -1) return;
   const it = po.items[idx];
-  fieldEl('NamaBarang').value = it.namaBarang || '';
-  fieldEl('Satuan').value = it.satuan || '';
+  row.querySelector('.nir-nama').value = it.namaBarang || '';
+  row.querySelector('.nir-satuan').value = it.satuan || '';
+}
+
+function itemRowHtml(rowId) {
+  return `
+    <div class="nota-item-row" data-rowid="${rowId}">
+      <input class="nir-nama" placeholder="Nama barang">
+      <div class="nota-item-row-sub">
+        <input class="nir-jumlah" type="number" placeholder="Jumlah">
+        <input class="nir-satuan" list="satuanList" placeholder="Satuan">
+        <input class="nir-harga" type="number" placeholder="Harga (total barang ini)">
+        <button type="button" class="nir-remove" data-rowid="${rowId}" title="Hapus baris ini">✕</button>
+      </div>
+      <select class="nir-poitem hidden"><option value="">— Tidak dikaitkan ke barang PO tertentu —</option></select>
+    </div>`;
+}
+
+function addItemRow(prefill) {
+  rowCounter += 1;
+  const wrap = document.getElementById('pembelianItemRows');
+  wrap.insertAdjacentHTML('beforeend', itemRowHtml(rowCounter));
+  const row = wrap.querySelector(`.nota-item-row[data-rowid="${rowCounter}"]`);
+  row.querySelector('.nir-remove').addEventListener('click', () => removeItemRow(rowCounter));
+  row.querySelector('.nir-poitem').addEventListener('change', () => applyPoItemToRow(row));
+  populateRowPoItemSelect(row);
+  if (prefill) {
+    row.querySelector('.nir-nama').value = prefill.namaBarang || '';
+    row.querySelector('.nir-jumlah').value = prefill.jumlah ?? '';
+    row.querySelector('.nir-satuan').value = prefill.satuan || '';
+    row.querySelector('.nir-harga').value = prefill.harga ?? '';
+    if (prefill.poItemId) row.querySelector('.nir-poitem').value = prefill.poItemId;
+  }
+}
+
+function removeItemRow(rowId) {
+  const wrap = document.getElementById('pembelianItemRows');
+  const row = wrap.querySelector(`.nota-item-row[data-rowid="${rowId}"]`);
+  if (row) row.remove();
+  if (wrap.children.length === 0) addItemRow();
+}
+
+function resetItemRows() {
+  document.getElementById('pembelianItemRows').innerHTML = '';
+  rowCounter = 0;
+  addItemRow();
+}
+
+function readItemRows() {
+  const rows = document.querySelectorAll('#pembelianItemRows .nota-item-row');
+  const items = [];
+  rows.forEach(row => {
+    const namaBarang = row.querySelector('.nir-nama').value.trim();
+    const jumlah = row.querySelector('.nir-jumlah').value;
+    const satuan = row.querySelector('.nir-satuan').value.trim();
+    const harga = row.querySelector('.nir-harga').value;
+    const poItemId = row.querySelector('.nir-poitem').value || null;
+    if (!namaBarang && !jumlah && !satuan && !harga) return; // baris kosong, lewati
+    items.push({ namaBarang, jumlah, satuan, harga, poItemId });
+  });
+  return items;
 }
 
 function fieldEl(name) {
@@ -203,15 +269,15 @@ function startEditPembelian(item) {
   fieldEl('NoHp').value = item.noHpToko || '';
   fieldEl('AlamatToko').value = item.alamatToko || '';
   fieldEl('NamaPembeli').value = item.namaPembeli || '';
-  fieldEl('NamaBarang').value = item.namaBarang || '';
-  fieldEl('Jumlah').value = item.jumlah ?? '';
-  fieldEl('Satuan').value = item.satuan || '';
-  fieldEl('Harga').value = item.harga ?? '';
   fieldEl('Catatan').value = item.catatan || '';
 
   document.getElementById('pembelianPoId').value = item.poId || '';
-  populatePoItemSelect();
-  document.getElementById('pembelianPoItem').value = item.poItemId || '';
+  document.getElementById('pembelianItemRows').innerHTML = '';
+  rowCounter = 0;
+  addItemRow({ namaBarang: item.namaBarang, jumlah: item.jumlah, satuan: item.satuan, harga: item.harga, poItemId: item.poItemId });
+
+  // Mengedit selalu satu barang (satu dokumen) — tombol tambah baris disembunyikan selama mode edit ini.
+  document.getElementById('btnTambahBarangPembelian').classList.add('hidden');
 
   document.getElementById('btnSavePembelian').textContent = 'Update Pembelian';
   document.getElementById('btnCancelEditPembelian').classList.remove('hidden');
@@ -222,7 +288,8 @@ function cancelEditPembelian() {
   editingId = null;
   for (const name of FIELD_IDS) fieldEl(name).value = '';
   document.getElementById('pembelianPoId').value = '';
-  populatePoItemSelect();
+  resetItemRows();
+  document.getElementById('btnTambahBarangPembelian').classList.remove('hidden');
   document.getElementById('btnSavePembelian').textContent = 'Simpan Pembelian';
   document.getElementById('btnCancelEditPembelian').classList.add('hidden');
 }
@@ -250,39 +317,43 @@ export async function savePembelian() {
   const values = {};
   for (const name of FIELD_IDS) values[name] = fieldEl(name).value.trim();
 
-  if (!values.NamaToko || !values.AlamatToko || !values.NamaPembeli || !values.NamaBarang || !values.Jumlah || !values.Satuan || !values.Harga) {
-    alert('Mohon isi nama toko, alamat toko, nama pembeli, nama barang, jumlah, satuan, dan harga.');
+  if (!values.NamaToko || !values.AlamatToko || !values.NamaPembeli) {
+    alert('Mohon isi nama toko, alamat toko, dan nama pembeli.');
+    return;
+  }
+
+  const rows = readItemRows();
+  if (rows.length === 0) {
+    alert('Mohon isi minimal satu barang (nama, jumlah, satuan, dan harga).');
+    return;
+  }
+  const rowTakLengkap = rows.find(r => !r.namaBarang || !r.jumlah || !r.satuan || !r.harga);
+  if (rowTakLengkap) {
+    alert(`Mohon lengkapi nama, jumlah, satuan, dan harga untuk barang "${rowTakLengkap.namaBarang || '(belum diisi)'}".`);
     return;
   }
 
   const poId = document.getElementById('pembelianPoId').value || null;
-  const poItemId = poId ? (document.getElementById('pembelianPoItem').value || null) : null;
-
-  const entry = {
+  const toko = {
     namaToko: values.NamaToko,
     noHpToko: values.NoHp,
     alamatToko: values.AlamatToko,
     namaPembeli: values.NamaPembeli,
-    namaBarang: values.NamaBarang,
-    jumlah: Number(values.Jumlah),
-    satuan: values.Satuan,
-    harga: Number(values.Harga),
     catatan: values.Catatan,
-    poId, poItemId,
   };
   const isEdit = !!editingId;
-  if (isEdit) {
-    entry.updatedAt = serverTimestamp();
-    entry.updatedBy = state.currentUserEmail;
-  } else {
-    entry.createdAt = serverTimestamp();
-    entry.createdBy = state.currentUserEmail;
-  }
 
   const btn = document.getElementById('btnSavePembelian');
   btn.disabled = true; btn.textContent = 'Menyimpan...';
   try {
     if (isEdit) {
+      const r = rows[0];
+      const entry = {
+        ...toko,
+        namaBarang: r.namaBarang, jumlah: Number(r.jumlah), satuan: r.satuan, harga: Number(r.harga),
+        poId, poItemId: poId ? r.poItemId : null,
+        updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
+      };
       await updateDoc(doc(state.db, 'pembelianBahanMakanan', editingId), entry);
       logActivity({
         action: 'ubah',
@@ -291,15 +362,27 @@ export async function savePembelian() {
       });
       cancelEditPembelian();
     } else {
-      await addDoc(collection(state.db, 'pembelianBahanMakanan'), entry);
+      const batch = writeBatch(state.db);
+      rows.forEach(r => {
+        const ref = doc(collection(state.db, 'pembelianBahanMakanan'));
+        batch.set(ref, {
+          ...toko,
+          namaBarang: r.namaBarang, jumlah: Number(r.jumlah), satuan: r.satuan, harga: Number(r.harga),
+          poId, poItemId: poId ? r.poItemId : null,
+          createdAt: serverTimestamp(), createdBy: state.currentUserEmail,
+        });
+      });
+      await batch.commit();
       logActivity({
         action: 'tambah',
         modul: 'Koperasi - Pembelian',
-        ringkasan: `Beli ${entry.jumlah} ${entry.satuan} ${entry.namaBarang} dari ${entry.namaToko} (${formatRupiah(entry.harga)})`,
+        ringkasan: rows.length === 1
+          ? `Beli ${Number(rows[0].jumlah)} ${rows[0].satuan} ${rows[0].namaBarang} dari ${toko.namaToko} (${formatRupiah(Number(rows[0].harga))})`
+          : `Beli ${rows.length} barang dari ${toko.namaToko} (${formatRupiah(rows.reduce((s, r) => s + Number(r.harga), 0))})`,
       });
       for (const name of FIELD_IDS) fieldEl(name).value = '';
       document.getElementById('pembelianPoId').value = '';
-      populatePoItemSelect();
+      resetItemRows();
     }
   } catch (e) {
     console.error(e);
@@ -340,6 +423,7 @@ export function downloadLaporanPembelian() {
 
 export function initPembelianEvents() {
   document.getElementById('btnSavePembelian').addEventListener('click', savePembelian);
+  document.getElementById('btnTambahBarangPembelian').addEventListener('click', () => addItemRow());
   document.getElementById('pembelianFilterDari').addEventListener('change', renderPembelian);
   document.getElementById('pembelianFilterSampai').addEventListener('change', renderPembelian);
   document.getElementById('btnPembelianFilterReset').addEventListener('click', () => {
@@ -349,7 +433,7 @@ export function initPembelianEvents() {
   });
   document.getElementById('btnDownloadPembelian').addEventListener('click', downloadLaporanPembelian);
   document.getElementById('btnCancelEditPembelian').addEventListener('click', cancelEditPembelian);
-  document.getElementById('pembelianPoId').addEventListener('change', populatePoItemSelect);
-  document.getElementById('pembelianPoItem').addEventListener('change', applyPoItemToForm);
+  document.getElementById('pembelianPoId').addEventListener('change', refreshAllRowPoItemSelects);
+  resetItemRows();
   refreshPoOptions();
 }
