@@ -604,6 +604,10 @@ footer{margin-top:56px;text-align:center;font-size:11.5px;color:var(--muted);}
   .print-report .invoice-signature-2col{display:flex;justify-content:space-between;gap:20px;margin-top:34px;font-size:11.5px;}
   .print-report .invoice-signature-2col > div{flex:1;}
   .print-report .invoice-signature-2col > div.right{text-align:right;}
+  .print-report .invoice-signature-2col .sig-visual{position:relative;height:92px;width:100%;max-width:150px;}
+  .print-report .invoice-signature-2col .sig-stempel{position:absolute;left:0;top:4px;width:62px;mix-blend-mode:multiply;}
+  .print-report .invoice-signature-2col .sig-ttd{position:absolute;left:36px;top:28px;width:88px;mix-blend-mode:multiply;}
+  .print-report .invoice-signature-2col .sig-ttd-solo{left:6px;top:18px;width:110px;}
   .print-report .invoice-signature-3col{display:grid;grid-template-columns:repeat(3,1fr);column-gap:14px;row-gap:4px;margin-top:34px;font-size:11.5px;}
   .print-report .invoice-signature-3col .sig-visual{position:relative;height:92px;width:100%;max-width:150px;}
   .print-report .invoice-signature-3col .sig-stempel{position:absolute;left:0;top:4px;width:62px;mix-blend-mode:multiply;}
@@ -612,6 +616,14 @@ footer{margin-top:56px;text-align:center;font-size:11.5px;color:var(--muted);}
   .print-report .invoice-signature .sig-space,.print-report .invoice-signature-2col .sig-space{height:50px;}
   .print-report .invoice-signature-3col .sig-space{height:92px;}
   .print-report .invoice-signature .sig-name,.print-report .invoice-signature-2col .sig-name,.print-report .invoice-signature-3col .sig-name{font-weight:700;text-decoration:underline;}
+
+  /* Surat Jalan — kop surat & judul terpisah (bukan sejajar seperti Invoice), meniru format berita acara resmi koperasi */
+  .print-report .sj-title{text-align:center;font-size:26px;font-weight:900;letter-spacing:2px;margin:26px 0 22px;color:#000;}
+  .print-report .sj-nomor{font-size:12px;margin-bottom:14px;}
+  .print-report .sj-pembuka{font-size:12px;margin-bottom:14px;}
+  .print-report .sj-pihak{font-size:12px;margin-bottom:16px;line-height:1.7;}
+  .print-report .sj-penutup{font-size:12px;margin-top:14px;line-height:1.7;}
+  .print-report .sj-ttd-kota{font-size:12px;margin-top:18px;}
 
   /* Varian biru untuk dokumen non-final (Konfirmasi Harga / Persetujuan Harga) — merah tetap khusus Invoice resmi */
   .print-report .doc-accent-blue .invoice-head{border-bottom-color:#1668B0;}

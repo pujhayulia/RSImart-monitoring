@@ -23,6 +23,7 @@ export const KOPERASI_INFO = {
   namaSingkat: 'Koperasi NIS',
   alamatBaris: ['Jl. Hos Cokroaminoto No 11', 'RT.001/RW.07, Sudimara Jaya.', 'Kec. Ciledug, Kota Tangerang, Banten 15151'],
   alamat: 'Jl. Hos Cokroaminoto No 11, RT.001/RW.07, Sudimara Jaya, Kec. Ciledug, Kota Tangerang, Banten 15151',
+  kota: 'Tangerang',
   bankNama: 'BTN',
   bankRekening: '43.01.88.000934.7',
   bankAtasNama: 'Koperasi Konsumen Niaga Indonesia Sejahtera',

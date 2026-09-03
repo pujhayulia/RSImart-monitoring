@@ -196,8 +196,27 @@ export function notaTotalNilai(nota) {
   return (nota.items || []).reduce((sum, it) => sum + (itemNilai(it) || 0), 0);
 }
 
-function nextSuratJalanNomor(year) {
-  const prefix = `SJ/${year}/`;
+const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+const BULAN_NAMA = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const HARI_NAMA = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+/** "2026-03-07" -> "Sabtu tanggal 7 bulan Maret tahun 2026" — dipakai di kalimat pembuka Surat Jalan. */
+function tanggalFormal(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dateObj = new Date(y, m - 1, d);
+  return `${HARI_NAMA[dateObj.getDay()]} tanggal ${d} bulan ${BULAN_NAMA[m - 1]} tahun ${y}`;
+}
+
+/** "2026-03-07" -> "7 Maret 2026" — dipakai di baris tempat & tanggal tanda tangan. */
+function tanggalRingkas(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${BULAN_NAMA[m - 1]} ${y}`;
+}
+
+/** Format nomor surat jalan koperasi: SJ/{bulan romawi}/{tahun}/{urut 3 digit} — urutan reset tiap bulan. */
+function nextSuratJalanNomor(tanggalIso) {
+  const [y, m] = tanggalIso.split('-');
+  const prefix = `SJ/${BULAN_ROMAWI[parseInt(m, 10) - 1]}/${y}/`;
   let max = 0;
   state.lastDistribusiSppgItems.forEach(nota => {
     if (nota.suratJalanNomor && nota.suratJalanNomor.startsWith(prefix)) {
@@ -205,7 +224,7 @@ function nextSuratJalanNomor(year) {
       if (!isNaN(n) && n > max) max = n;
     }
   });
-  return `${prefix}${String(max + 1).padStart(4, '0')}`;
+  return `${prefix}${String(max + 1).padStart(3, '0')}`;
 }
 
 function suratJalanHeadCompanyHtml() {
@@ -222,7 +241,8 @@ function suratJalanHeadCompanyHtml() {
 // Nama-nama yang biasa mengantar barang, buat pilihan cepat di kolom "Nama Pengirim" — beda barang/pemasok biasanya beda orang yang antar.
 const NAMA_PENGIRIM_UMUM = [KOPERASI_INFO.penandaTangan, 'Farhan', 'Pak Margi'];
 
-const CATATAN_PENERIMAAN_STANDAR = 'Mohon lakukan pemeriksaan jumlah dan kondisi barang saat penerimaan. Barang yang sudah ditandatangani dianggap telah diterima dalam keadaan baik dan lengkap.';
+const SURAT_JALAN_KONFIRMASI = 'Seluruh barang telah diterima dalam kondisi <b>baik dan lengkap</b> sesuai dengan pesanan.';
+const SURAT_JALAN_PENUTUP = 'Demikian Surat Jalan dan Berita Acara ini dibuat untuk dipergunakan sebagaimana mestinya.';
 
 /** Buka/tutup form kecil "Nama Pengirim" sebelum benar-benar cetak — satu nota bisa dikirim orang berbeda-beda tergantung asal barangnya. */
 function toggleSuratJalanForm(notaId) {
@@ -288,7 +308,7 @@ async function submitSuratJalan(notaId) {
   }
 
   const tanggalSurat = nota.suratJalanTanggal || nota.tanggalKirim || todayIso();
-  const nomor = nota.suratJalanNomor || nextSuratJalanNomor(tanggalSurat.slice(0, 4));
+  const nomor = nota.suratJalanNomor || nextSuratJalanNomor(tanggalSurat);
   const pengirimGabungan = groups.map(g => g.pengirim).join(', ');
 
   try {
@@ -309,54 +329,65 @@ async function submitSuratJalan(notaId) {
   printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat }, groups);
 }
 
+const SURAT_JALAN_MIN_BARIS = 10; // baris kosong ditambahkan sampai minimal segini, meniru formulir cetak koperasi
+
 function suratJalanPageHtml(nota, pengirim, items, needsPageBreak) {
-  const rows = items.map((it, i) => `
+  let rows = items.map((it, i) => `
     <tr>
       <td>${i + 1}</td>
       <td>${escapeHtml(it.namaBarang)}</td>
-      <td style="text-align:right">${it.jumlah ?? '-'}</td>
       <td>${escapeHtml(it.satuan || '')}</td>
+      <td style="text-align:right">${it.jumlah ?? '-'}</td>
+      <td>Baik</td>
+      <td></td>
     </tr>
   `).join('');
+  for (let i = items.length; i < SURAT_JALAN_MIN_BARIS; i++) {
+    rows += `<tr><td>${i + 1}</td><td></td><td></td><td></td><td></td><td></td></tr>`;
+  }
 
   const ttdPengirim = TTD_PENGIRIM[pengirim.trim().toLowerCase()];
+  const tanggalSurat = nota.suratJalanTanggal || nota.tanggalKirim;
 
   return `
-    <div class="doc-accent-blue${needsPageBreak ? ' print-page-break' : ''}">
-      <div class="invoice-head">
-        ${suratJalanHeadCompanyHtml()}
-        <div class="invoice-title">SURAT JALAN</div>
+    <div${needsPageBreak ? ' class="print-page-break"' : ''}>
+      ${suratJalanHeadCompanyHtml()}
+      <div class="sj-title">SURAT JALAN</div>
+      <div class="sj-nomor">Nomor : ${escapeHtml(nota.suratJalanNomor)}</div>
+      <div class="sj-pembuka">Pada hari ini ${tanggalFormal(tanggalSurat)}, telah dilakukan pengiriman dari:</div>
+      <div class="sj-pihak">
+        <b>${escapeHtml(KOPERASI_INFO.nama.toUpperCase())}</b><br>
+        kepada<br>
+        <b>${escapeHtml(nota.tujuanSppg)}</b>
       </div>
-      <div class="invoice-to-row">
-        <div class="to">Kepada: <b>${escapeHtml(nota.tujuanSppg)}</b></div>
-        <div class="meta-right">
-          <div class="row"><span class="lbl">Nomor:</span> ${escapeHtml(nota.suratJalanNomor)}</div>
-          <div class="row"><span class="lbl">Tanggal:</span> ${formatDate(nota.tanggalKirim)}${nota.jamKirim ? ', ' + escapeHtml(nota.jamKirim) : ''}</div>
-        </div>
-      </div>
+      <div style="font-size:12px;margin-bottom:8px;">Dengan rincian sebagai berikut:</div>
       <table class="invoice-table">
-        <thead><tr><th>No</th><th>Nama Barang</th><th>Jumlah</th><th>Satuan</th></tr></thead>
+        <thead><tr><th>No</th><th>Nama Barang</th><th>Satuan</th><th>Qty</th><th>Kondisi</th><th>Keterangan</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${nota.catatan ? `<div style="margin-top:12px;font-size:11.5px;"><b>Catatan:</b> ${escapeHtml(nota.catatan)}</div>` : ''}
-      <div style="margin-top:6px;font-size:10.5px;color:#555;">${escapeHtml(CATATAN_PENERIMAAN_STANDAR)}</div>
-      <div class="invoice-signature-3col">
-        <div>Pengirim,</div>
-        <div>Penerima,</div>
-        <div>Sopir / Pembawa,</div>
-        ${ttdPengirim ? `
-        <div class="sig-visual">
-          ${ttdPengirim.stempel ? `<img class="sig-stempel" src="${ttdPengirim.stempel}" alt="">` : ''}
-          <img class="sig-ttd${ttdPengirim.stempel ? '' : ' sig-ttd-solo'}" src="${ttdPengirim.ttd}" alt="">
-        </div>` : `<div class="sig-space"></div>`}
-        <div class="sig-space"></div>
-        <div class="sig-space"></div>
-        <div class="sig-name">${escapeHtml(pengirim)}</div>
-        <div class="sig-name">&nbsp;</div>
-        <div class="sig-name">&nbsp;</div>
-        <div>${escapeHtml(KOPERASI_INFO.nama)}</div>
-        <div>${escapeHtml(nota.tujuanSppg)}</div>
-        <div>&nbsp;</div>
+      <div class="sj-penutup">
+        <div>${SURAT_JALAN_KONFIRMASI}</div>
+        <div>${SURAT_JALAN_PENUTUP}</div>
+      </div>
+      <div class="sj-ttd-kota">${escapeHtml(KOPERASI_INFO.kota)}, ${tanggalRingkas(tanggalSurat)}</div>
+      <div class="invoice-signature-2col">
+        <div>
+          <div>Pengirim,</div>
+          ${ttdPengirim ? `
+          <div class="sig-visual">
+            ${ttdPengirim.stempel ? `<img class="sig-stempel" src="${ttdPengirim.stempel}" alt="">` : ''}
+            <img class="sig-ttd${ttdPengirim.stempel ? '' : ' sig-ttd-solo'}" src="${ttdPengirim.ttd}" alt="">
+          </div>` : `<div class="sig-space"></div>`}
+          <div class="sig-name">${escapeHtml(pengirim)}</div>
+          <div>${escapeHtml(KOPERASI_INFO.nama)}</div>
+        </div>
+        <div>
+          <div>Penerima,</div>
+          <div class="sig-space"></div>
+          <div class="sig-name">&nbsp;</div>
+          <div>${escapeHtml(nota.tujuanSppg)}</div>
+        </div>
       </div>
     </div>
   `;
