@@ -11,7 +11,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
 import { KOPERASI_INFO } from './data.js';
-import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso } from './utils.js';
+import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 import { printReport } from './print-report.js';
@@ -1112,6 +1112,9 @@ export function initPoSppgEvents() {
   document.getElementById('btnImportPoExcel').addEventListener('click', () => document.getElementById('inputImportPoExcel').click());
   document.getElementById('inputImportPoExcel').addEventListener('change', handleImportPoExcel);
   document.getElementById('btnCancelEditPo').addEventListener('click', cancelEditPo);
+  const { dari, sampai } = monthRange();
+  document.getElementById('poFilterDari').value = dari;
+  document.getElementById('poFilterSampai').value = sampai;
   ['poFilterStatus', 'poFilterDari', 'poFilterSampai'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderPoSppg);
   });
