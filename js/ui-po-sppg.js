@@ -120,6 +120,7 @@ const KOLOM_PO_EXCEL = {
   jumlah: ['jumlah', 'qty', 'quantity', 'banyak', 'qtypesan'],
   satuan: ['satuan', 'unit', 'uom'],
   harga: ['harga', 'hargasatuan', 'hargarencana', 'hargasatuanrencana', 'price'],
+  tanggal: ['tanggalpengiriman', 'tanggalkirim', 'tglpengiriman', 'tglkirim', 'tanggalpo', 'tanggal', 'tgl'],
 };
 
 function normalisasiHeaderKolom(h) {
@@ -127,7 +128,7 @@ function normalisasiHeaderKolom(h) {
 }
 
 /**
- * Cari field internal (namaBarang/jumlah/satuan/harga) yang cocok dengan satu header kolom Excel. Dicek
+ * Cari field internal (namaBarang/jumlah/satuan/harga/tanggal) yang cocok dengan satu header kolom Excel. Dicek
  * exact match dulu di semua field, baru substring — dan untuk substring, "harga" dicek sebelum "satuan"
  * supaya header seperti "Harga Satuan" tidak salah kejebak ke field satuan gara-gara mengandung kata "satuan".
  */
@@ -136,10 +137,27 @@ function cocokkanKolomPo(header) {
   for (const [field, aliases] of Object.entries(KOLOM_PO_EXCEL)) {
     if (aliases.includes(n)) return field;
   }
-  for (const field of ['namaBarang', 'harga', 'jumlah', 'satuan']) {
+  for (const field of ['namaBarang', 'harga', 'jumlah', 'satuan', 'tanggal']) {
     if (KOLOM_PO_EXCEL[field].some(a => n.includes(a))) return field;
   }
   return null;
+}
+
+// Nama bulan Indonesia — dipakai buat mengenali tanggal seperti "Minggu, 23 Agustus 2026" dari kolom
+// "Tanggal Pengiriman" di file PO (biasanya ditulis manual sebagai teks, bukan sel tanggal Excel asli).
+const BULAN_INDONESIA = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+
+/** Ubah nilai kolom tanggal (teks Indonesia atau objek Date dari Excel) jadi format ISO "YYYY-MM-DD" untuk <input type="date">. */
+function parseTanggalIndonesia(v) {
+  if (v === undefined || v === null || v === '') return '';
+  if (v instanceof Date && !isNaN(v)) {
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  }
+  const m = String(v).toLowerCase().match(/(\d{1,2})\s+([a-zé]+)\s+(\d{4})/);
+  if (!m) return '';
+  const bulanIdx = BULAN_INDONESIA.indexOf(m[2]);
+  if (bulanIdx === -1) return '';
+  return `${m[3]}-${String(bulanIdx + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 }
 
 /**
@@ -295,10 +313,14 @@ async function poEkstrakBarisDocx(arrayBuffer) {
       const kolomMap = found ? found.kolomMap : {};
       const idxNama = found ? found.kolomMap.namaBarang : 0;
       const rows = [];
+      let tanggalTerdeteksi = '';
       dataTrs.forEach(tr => {
         const cells = Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim());
         const namaBarang = cells[idxNama] || '';
         if (!namaBarang) return;
+        if (!tanggalTerdeteksi && kolomMap.tanggal !== undefined) {
+          tanggalTerdeteksi = parseTanggalIndonesia(cells[kolomMap.tanggal]);
+        }
         rows.push({
           namaBarang,
           jumlah: kolomMap.jumlah !== undefined ? cells[kolomMap.jumlah] || '' : (cells[1] || ''),
@@ -307,11 +329,11 @@ async function poEkstrakBarisDocx(arrayBuffer) {
         });
       });
       // Kalau hasilnya mencurigakan (kolom kena salah), coba jalur teks bebas dulu sebelum menyerah total.
-      if (rows.length > 0 && poHasilImportMasukAkal(rows)) return rows;
+      if (rows.length > 0 && poHasilImportMasukAkal(rows)) return { rows, tanggalTerdeteksi };
     }
   }
   const rawText = await mammoth.extractRawText({ arrayBuffer });
-  return poTeksKeBaris(rawText.value);
+  return { rows: poTeksKeBaris(rawText.value), tanggalTerdeteksi: '' };
 }
 
 /** OCR foto/scan (JPG/PNG) lewat Tesseract.js — paling lambat & paling tidak akurat dari semua jenis file yang didukung. */
@@ -342,20 +364,28 @@ function poBacaBarisExcel(arrayBuffer) {
   }
   const { headerRowIdx, kolomMap } = found;
 
+  // Kolom "Tanggal Pengiriman" (kalau ada) dipakai buat menebak Tanggal PO secara otomatis — diambil dari
+  // baris data pertama yang punya tanggal terbaca, karena satu PO biasanya untuk satu tanggal pengiriman.
+  let tanggalTerdeteksi = '';
   const rows = rawRows.slice(headerRowIdx + 1)
-    .map(row => ({
-      namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
-      jumlah: kolomMap.jumlah !== undefined ? row[kolomMap.jumlah] : '',
-      satuan: kolomMap.satuan !== undefined ? String(row[kolomMap.satuan] || '').trim() : '',
-      harga: kolomMap.harga !== undefined ? row[kolomMap.harga] : '',
-    }))
+    .map(row => {
+      if (!tanggalTerdeteksi && kolomMap.tanggal !== undefined) {
+        tanggalTerdeteksi = parseTanggalIndonesia(row[kolomMap.tanggal]);
+      }
+      return {
+        namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
+        jumlah: kolomMap.jumlah !== undefined ? row[kolomMap.jumlah] : '',
+        satuan: kolomMap.satuan !== undefined ? String(row[kolomMap.satuan] || '').trim() : '',
+        harga: kolomMap.harga !== undefined ? row[kolomMap.harga] : '',
+      };
+    })
     // Baris "Total"/"Subtotal" (umum di PO yang punya beberapa sub-tabel per tanggal kirim) bukan barang.
     .filter(r => r.namaBarang && !/^(grand\s*|sub)?total$/i.test(r.namaBarang));
 
   if (!poHasilImportMasukAkal(rows)) {
     throw new Error('Kolom yang terbaca sepertinya keliru (nama barang malah berisi satuan seperti "Kg"/"Pcs"). Susunan tabel di file ini tidak terbaca dengan benar — coba rapikan filenya atau isi manual.');
   }
-  return rows;
+  return { rows, tanggalTerdeteksi };
 }
 
 /** Baca file yang dipilih (Excel/CSV, PDF, Word, atau foto JPG/PNG) dan tambahkan tiap barisnya sebagai baris barang PO — dipakai selain input manual. */
@@ -371,11 +401,12 @@ async function handleImportPoExcel(e) {
 
   try {
     let rows;
+    let tanggalTerdeteksi = '';
     let butuhPeriksaManual = false;
 
     if (EKSTENSI_EXCEL.includes(ext)) {
       if (typeof XLSX === 'undefined') throw new Error('Pembaca Excel belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
-      rows = poBacaBarisExcel(await file.arrayBuffer());
+      ({ rows, tanggalTerdeteksi } = poBacaBarisExcel(await file.arrayBuffer()));
     } else if (ext === 'pdf') {
       if (typeof pdfjsLib === 'undefined') throw new Error('Pembaca PDF belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
       if (btn) btn.textContent = 'Membaca PDF...';
@@ -384,7 +415,7 @@ async function handleImportPoExcel(e) {
     } else if (ext === 'doc' || ext === 'docx') {
       if (typeof mammoth === 'undefined') throw new Error('Pembaca Word belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
       if (btn) btn.textContent = 'Membaca dokumen Word...';
-      rows = await poEkstrakBarisDocx(await file.arrayBuffer());
+      ({ rows, tanggalTerdeteksi } = await poEkstrakBarisDocx(await file.arrayBuffer()));
       butuhPeriksaManual = true;
     } else if (['jpg', 'jpeg', 'png'].includes(ext)) {
       if (typeof Tesseract === 'undefined') throw new Error('Pembaca gambar (OCR) belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
@@ -418,7 +449,9 @@ async function handleImportPoExcel(e) {
       if (!first.querySelector('.nir-nama').value.trim()) first.remove();
     }
 
-    alert(`${rows.length} barang berhasil diimpor dari file.${butuhPeriksaManual ? '\n\nJenis file ini dibaca otomatis dari teks/gambar (bukan tabel Excel), jadi bisa saja ada yang salah baca — mohon PERIKSA ULANG tiap baris (nama, jumlah, satuan, harga) sebelum klik Simpan PO.' : ''}`);
+    if (tanggalTerdeteksi) document.getElementById('poTanggal').value = tanggalTerdeteksi;
+
+    alert(`${rows.length} barang berhasil diimpor dari file.${tanggalTerdeteksi ? ' Tanggal PO ikut disesuaikan otomatis dari isi file — cek lagi ya.' : ''}${butuhPeriksaManual ? '\n\nJenis file ini dibaca otomatis dari teks/gambar (bukan tabel Excel), jadi bisa saja ada yang salah baca — mohon PERIKSA ULANG tiap baris (nama, jumlah, satuan, harga) sebelum klik Simpan PO.' : ''}`);
   } catch (err) {
     console.error(err);
     alert(err.message || 'Gagal membaca file ini.');
