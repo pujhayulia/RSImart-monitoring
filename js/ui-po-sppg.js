@@ -198,9 +198,20 @@ function poParseBarisTeks(line) {
   return { namaBarang: nama, jumlah, satuan, harga };
 }
 
+// Baris yang jelas bukan barang — footer halaman umum di PDF/dokumen (URL, cap tanggal-jam, "Halaman 1/3")
+// — dibuang duluan supaya tidak ikut ketebak jadi barang palsu.
+function poBarisFooterSampah(line) {
+  const l = line.trim();
+  if (!l) return true;
+  if (/https?:\/\/|www\.\S+/i.test(l)) return true;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}/.test(l)) return true;
+  if (/^(halaman\s*|page\s*)?\d+\s*\/\s*\d+$/i.test(l)) return true;
+  return false;
+}
+
 /** Pecah blok teks bebas jadi baris-baris barang (dipakai untuk hasil ekstraksi PDF/Word/OCR foto). */
 function poTeksKeBaris(text) {
-  return text.split(/\r?\n/).map(poParseBarisTeks).filter(Boolean);
+  return text.split(/\r?\n/).filter(l => !poBarisFooterSampah(l)).map(poParseBarisTeks).filter(Boolean);
 }
 
 /** Ekstrak teks dari file PDF halaman per halaman lewat pdf.js, disusun ulang jadi baris berdasarkan posisi Y tiap potongan teks. */
