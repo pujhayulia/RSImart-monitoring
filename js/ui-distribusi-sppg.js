@@ -6,7 +6,7 @@ import {
   collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
-import { KOPERASI_INFO } from './data.js';
+import { KOPERASI_INFO, cariAlamatSppg } from './data.js';
 import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
@@ -372,6 +372,7 @@ function suratJalanPageHtml(nota, pengirim, items, needsPageBreak) {
         <b>${escapeHtml(KOPERASI_INFO.nama.toUpperCase())}</b><br>
         kepada<br>
         <b>${escapeHtml(nota.tujuanSppg)}</b>
+        ${(cariAlamatSppg(nota.tujuanSppg) || []).map(line => `<div class="addr">${escapeHtml(line)}</div>`).join('')}
       </div>
       <div style="font-size:12px;margin-bottom:8px;">Dengan rincian sebagai berikut:</div>
       <table class="invoice-table">

@@ -30,6 +30,26 @@ export const KOPERASI_INFO = {
   penandaTangan: 'Muh.Ghufron',
 };
 
+/**
+ * Alamat dapur SPPG — dipakai untuk menampilkan alamat penerima di Surat Jalan. Kunci = kata kunci
+ * (huruf kecil) yang dicari di dalam nama tujuan SPPG, supaya cocok walau nama persisnya beda-beda
+ * (mis. "sudimara" cocok untuk "SPPG Sudimara Jaya 2", "Dapur Sudimara", "Sudimara/Ciledug", dst).
+ * Tambahkan SPPG lain di sini kalau alamatnya sudah didapat — SPPG yang belum ada di sini cukup
+ * tidak menampilkan alamat sama sekali (bukan error).
+ */
+export const ALAMAT_SPPG = {
+  sudimara: ['Jl. Hos Cokroaminoto No.11 RT 004/RW 007', 'Kel. Sudimara Jaya 2, Kec. Ciledug', 'Kota Tangerang, Banten, 15151'],
+};
+
+/** Cari alamat SPPG dari nama tujuannya (lihat ALAMAT_SPPG) — null kalau belum ada datanya. */
+export function cariAlamatSppg(namaTujuan) {
+  const n = (namaTujuan || '').toLowerCase();
+  for (const [kataKunci, alamat] of Object.entries(ALAMAT_SPPG)) {
+    if (n.includes(kataKunci)) return alamat;
+  }
+  return null;
+}
+
 export const SEED_DATE = '2026-07-16';
 export const SEED_GUDANG = { isi: 133, kosong: 387, peredaran: 520, stokProduk: {} };
 

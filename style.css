@@ -622,6 +622,7 @@ footer{margin-top:56px;text-align:center;font-size:11.5px;color:var(--muted);}
   .print-report .sj-nomor{font-size:12px;margin-bottom:14px;}
   .print-report .sj-pembuka{font-size:12px;margin-bottom:14px;}
   .print-report .sj-pihak{font-size:12px;margin-bottom:16px;line-height:1.7;}
+  .print-report .sj-pihak .addr{font-size:10.5px;color:#444;line-height:1.4;}
   .print-report .sj-penutup{font-size:12px;margin-top:14px;line-height:1.7;}
   .print-report .sj-ttd-kota{font-size:12px;margin-top:18px;}
 
