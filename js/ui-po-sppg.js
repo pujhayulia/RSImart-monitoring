@@ -161,6 +161,28 @@ function parseTanggalIndonesia(v) {
 }
 
 /**
+ * Cari nama SPPG dari blok judul di atas tabel barang (baris sebelum baris header) — file PO nyata selalu
+ * menyebutkan nama SPPG tujuan secara eksplisit di sana (mis. sel tersendiri "SPPG SUDIMARA JAYA 2"), jadi
+ * dicari APA ADANYA dari teksnya, bukan ditebak dari nama file atau data lain.
+ */
+function poCariNamaSppg(rows, batasBarisHeader) {
+  const batas = batasBarisHeader === -1 ? rows.length : batasBarisHeader;
+  for (let i = 0; i < batas; i++) {
+    for (const cell of rows[i]) {
+      const s = String(cell ?? '').trim();
+      if (/^sppg\b/i.test(s)) {
+        return s.split(/\s+/).map(w => {
+          if (/^sppg$/i.test(w)) return 'SPPG';
+          if (/^\d+$/.test(w)) return w;
+          return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+        }).join(' ');
+      }
+    }
+  }
+  return '';
+}
+
+/**
  * Cari baris header tabel barang PO dari kumpulan baris tabel (array-of-array sel, dipakai bareng oleh
  * pembaca Excel & tabel Word). Baris header harus cocok kolom Nama Barang DAN minimal satu kolom lain
  * (Jumlah/Satuan/Harga) sekaligus — kalau cuma mengandalkan satu kata seperti "barang"/"bahan", teks biasa
@@ -312,14 +334,16 @@ async function poEkstrakBarisDocx(arrayBuffer) {
       const dataTrs = found ? trs.slice(found.headerRowIdx + 1) : trs;
       const kolomMap = found ? found.kolomMap : {};
       const idxNama = found ? found.kolomMap.namaBarang : 0;
+      const namaSppgTerdeteksi = poCariNamaSppg(cellRows, found ? found.headerRowIdx : -1);
       const rows = [];
-      let tanggalTerdeteksi = '';
+      const tanggalSet = new Set();
       dataTrs.forEach(tr => {
         const cells = Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim());
         const namaBarang = cells[idxNama] || '';
         if (!namaBarang) return;
-        if (!tanggalTerdeteksi && kolomMap.tanggal !== undefined) {
-          tanggalTerdeteksi = parseTanggalIndonesia(cells[kolomMap.tanggal]);
+        if (kolomMap.tanggal !== undefined) {
+          const t = parseTanggalIndonesia(cells[kolomMap.tanggal]);
+          if (t) tanggalSet.add(t);
         }
         rows.push({
           namaBarang,
@@ -329,11 +353,20 @@ async function poEkstrakBarisDocx(arrayBuffer) {
         });
       });
       // Kalau hasilnya mencurigakan (kolom kena salah), coba jalur teks bebas dulu sebelum menyerah total.
-      if (rows.length > 0 && poHasilImportMasukAkal(rows)) return { rows, tanggalTerdeteksi };
+      if (rows.length > 0 && poHasilImportMasukAkal(rows)) {
+        let tanggalTerdeteksi = '', tanggalInfo = '';
+        if (tanggalSet.size === 1) {
+          tanggalTerdeteksi = [...tanggalSet][0];
+        } else if (tanggalSet.size > 1) {
+          const sorted = [...tanggalSet].sort();
+          tanggalInfo = `File ini mencakup ${tanggalSet.size} tanggal pengiriman berbeda (${formatDate(sorted[0])} – ${formatDate(sorted[sorted.length - 1])}), jadi Tanggal PO tidak diisi otomatis — mohon isi manual.`;
+        }
+        return { rows, tanggalTerdeteksi, tanggalInfo, namaSppgTerdeteksi };
+      }
     }
   }
   const rawText = await mammoth.extractRawText({ arrayBuffer });
-  return { rows: poTeksKeBaris(rawText.value), tanggalTerdeteksi: '' };
+  return { rows: poTeksKeBaris(rawText.value), tanggalTerdeteksi: '', tanggalInfo: '', namaSppgTerdeteksi: '' };
 }
 
 /** OCR foto/scan (JPG/PNG) lewat Tesseract.js — paling lambat & paling tidak akurat dari semua jenis file yang didukung. */
@@ -363,14 +396,18 @@ function poBacaBarisExcel(arrayBuffer) {
     throw new Error(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", "Bahan", atau "Deskripsi".`);
   }
   const { headerRowIdx, kolomMap } = found;
+  const namaSppgTerdeteksi = poCariNamaSppg(rawRows, headerRowIdx);
 
-  // Kolom "Tanggal Pengiriman" (kalau ada) dipakai buat menebak Tanggal PO secara otomatis — diambil dari
-  // baris data pertama yang punya tanggal terbaca, karena satu PO biasanya untuk satu tanggal pengiriman.
-  let tanggalTerdeteksi = '';
+  // Kolom "Tanggal Pengiriman" (kalau ada) dicatat SEMUA tanggal berbeda yang muncul — bukan cuma baris
+  // pertama — karena satu file PO nyata bisa mencakup beberapa tanggal pengiriman sekaligus (satu minggu
+  // penuh, mis.). Tanggal PO cuma diisi otomatis kalau isi filenya memang cuma satu tanggal yang jelas;
+  // kalau ada beberapa, itu bukan hal yang boleh ditebak sendiri — dikasih tahu ke pengguna untuk diisi manual.
+  const tanggalSet = new Set();
   const rows = rawRows.slice(headerRowIdx + 1)
     .map(row => {
-      if (!tanggalTerdeteksi && kolomMap.tanggal !== undefined) {
-        tanggalTerdeteksi = parseTanggalIndonesia(row[kolomMap.tanggal]);
+      if (kolomMap.tanggal !== undefined) {
+        const t = parseTanggalIndonesia(row[kolomMap.tanggal]);
+        if (t) tanggalSet.add(t);
       }
       return {
         namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
@@ -385,7 +422,16 @@ function poBacaBarisExcel(arrayBuffer) {
   if (!poHasilImportMasukAkal(rows)) {
     throw new Error('Kolom yang terbaca sepertinya keliru (nama barang malah berisi satuan seperti "Kg"/"Pcs"). Susunan tabel di file ini tidak terbaca dengan benar — coba rapikan filenya atau isi manual.');
   }
-  return { rows, tanggalTerdeteksi };
+
+  let tanggalTerdeteksi = '';
+  let tanggalInfo = '';
+  if (tanggalSet.size === 1) {
+    tanggalTerdeteksi = [...tanggalSet][0];
+  } else if (tanggalSet.size > 1) {
+    const sorted = [...tanggalSet].sort();
+    tanggalInfo = `File ini mencakup ${tanggalSet.size} tanggal pengiriman berbeda (${formatDate(sorted[0])} – ${formatDate(sorted[sorted.length - 1])}), jadi Tanggal PO tidak diisi otomatis — mohon isi manual.`;
+  }
+  return { rows, tanggalTerdeteksi, tanggalInfo, namaSppgTerdeteksi };
 }
 
 /** Baca file yang dipilih (Excel/CSV, PDF, Word, atau foto JPG/PNG) dan tambahkan tiap barisnya sebagai baris barang PO — dipakai selain input manual. */
@@ -402,11 +448,13 @@ async function handleImportPoExcel(e) {
   try {
     let rows;
     let tanggalTerdeteksi = '';
+    let tanggalInfo = '';
+    let namaSppgTerdeteksi = '';
     let butuhPeriksaManual = false;
 
     if (EKSTENSI_EXCEL.includes(ext)) {
       if (typeof XLSX === 'undefined') throw new Error('Pembaca Excel belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
-      ({ rows, tanggalTerdeteksi } = poBacaBarisExcel(await file.arrayBuffer()));
+      ({ rows, tanggalTerdeteksi, tanggalInfo, namaSppgTerdeteksi } = poBacaBarisExcel(await file.arrayBuffer()));
     } else if (ext === 'pdf') {
       if (typeof pdfjsLib === 'undefined') throw new Error('Pembaca PDF belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
       if (btn) btn.textContent = 'Membaca PDF...';
@@ -415,7 +463,7 @@ async function handleImportPoExcel(e) {
     } else if (ext === 'doc' || ext === 'docx') {
       if (typeof mammoth === 'undefined') throw new Error('Pembaca Word belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
       if (btn) btn.textContent = 'Membaca dokumen Word...';
-      ({ rows, tanggalTerdeteksi } = await poEkstrakBarisDocx(await file.arrayBuffer()));
+      ({ rows, tanggalTerdeteksi, tanggalInfo, namaSppgTerdeteksi } = await poEkstrakBarisDocx(await file.arrayBuffer()));
       butuhPeriksaManual = true;
     } else if (['jpg', 'jpeg', 'png'].includes(ext)) {
       if (typeof Tesseract === 'undefined') throw new Error('Pembaca gambar (OCR) belum siap dimuat. Pastikan koneksi internet aktif, muat ulang halaman, lalu coba lagi.');
@@ -450,8 +498,15 @@ async function handleImportPoExcel(e) {
     }
 
     if (tanggalTerdeteksi) document.getElementById('poTanggal').value = tanggalTerdeteksi;
+    if (namaSppgTerdeteksi) document.getElementById('poTujuan').value = namaSppgTerdeteksi;
 
-    alert(`${rows.length} barang berhasil diimpor dari file.${tanggalTerdeteksi ? ' Tanggal PO ikut disesuaikan otomatis dari isi file — cek lagi ya.' : ''}${butuhPeriksaManual ? '\n\nJenis file ini dibaca otomatis dari teks/gambar (bukan tabel Excel), jadi bisa saja ada yang salah baca — mohon PERIKSA ULANG tiap baris (nama, jumlah, satuan, harga) sebelum klik Simpan PO.' : ''}`);
+    const catatanTambahan = [
+      tanggalTerdeteksi ? 'Tanggal PO ikut disesuaikan otomatis dari isi file.' : '',
+      namaSppgTerdeteksi ? `Tujuan/Nama SPPG ikut diisi otomatis dari file: "${namaSppgTerdeteksi}".` : '',
+      tanggalInfo,
+      butuhPeriksaManual ? 'Jenis file ini dibaca otomatis dari teks/gambar (bukan tabel Excel), jadi bisa saja ada yang salah baca — mohon PERIKSA ULANG tiap baris (nama, jumlah, satuan, harga) sebelum klik Simpan PO.' : '',
+    ].filter(Boolean).join('\n');
+    alert(`${rows.length} barang berhasil diimpor dari file.${catatanTambahan ? '\n\n' + catatanTambahan : ''}`);
   } catch (err) {
     console.error(err);
     alert(err.message || 'Gagal membaca file ini.');
