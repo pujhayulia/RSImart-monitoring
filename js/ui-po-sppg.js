@@ -142,8 +142,52 @@ function cocokkanKolomPo(header) {
   return null;
 }
 
+/**
+ * Cari baris header tabel barang PO dari kumpulan baris tabel (array-of-array sel, dipakai bareng oleh
+ * pembaca Excel & tabel Word). Baris header harus cocok kolom Nama Barang DAN minimal satu kolom lain
+ * (Jumlah/Satuan/Harga) sekaligus — kalau cuma mengandalkan satu kata seperti "barang"/"bahan", teks biasa
+ * yang kebetulan mengandung kata itu (judul dokumen "...Bahan Baku", nama menu "Pisang Barangan", dst) gampang
+ * salah kejebak. Sebagai pengaman kedua, baris data pertama sesudahnya juga dicek: kalau kolom Jumlah
+ * kedeteksi, isinya di baris itu harus mengandung angka — soalnya baris header sungguhan selalu langsung
+ * diikuti data asli, sedangkan baris yang salah kejebak (blok menu/judul) diikuti baris teks lain juga.
+ */
+function poCariBarisHeader(rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const map = {};
+    rows[i].forEach((cell, idx) => {
+      const field = cocokkanKolomPo(cell);
+      if (field && map[field] === undefined) map[field] = idx;
+    });
+    if (map.namaBarang === undefined || Object.keys(map).length < 2) continue;
+
+    let barisData = null;
+    for (let j = i + 1; j < rows.length; j++) {
+      if (rows[j].some(c => String(c ?? '').trim() !== '')) { barisData = rows[j]; break; }
+    }
+    if (!barisData) continue;
+    if (map.jumlah !== undefined) {
+      const v = barisData[map.jumlah];
+      if (v === '' || v === undefined || v === null || !/\d/.test(String(v))) continue;
+    }
+    return { headerRowIdx: i, kolomMap: map };
+  }
+  return null;
+}
+
 // Satuan yang dikenali saat menebak isi baris teks bebas (PDF/Word/foto) — dipakai poParseBarisTeks().
 const SATUAN_DIKENAL_TEKS = ['kg', 'gram', 'gr', 'liter', 'ltr', 'pcs', 'pc', 'ikat', 'papan', 'dus', 'karung', 'botol', 'buah', 'ekor', 'sisir', 'bungkus', 'pack', 'lembar', 'unit', 'box', 'renceng'];
+
+/**
+ * Pengaman terakhir: kalau ternyata kolom Nama Barang KEMBALI salah kedeteksi (mis. kena kolom Satuan),
+ * hasilnya akan didominasi teks satuan ("Kg"/"Pcs"/dst) bukan nama barang sungguhan. Daripada diam-diam
+ * mengimpor barang salah, lebih baik gagal dengan pesan jelas supaya pengguna sadar dan cek filenya manual.
+ */
+function poHasilImportMasukAkal(rows) {
+  if (rows.length === 0) return true;
+  const satuanSet = new Set(SATUAN_DIKENAL_TEKS);
+  const kenaSatuanSaja = rows.filter(r => satuanSet.has(r.namaBarang.trim().toLowerCase())).length;
+  return kenaSatuanSaja <= rows.length / 2;
+}
 
 /**
  * Tebak nama barang/jumlah/satuan/harga dari SATU baris teks bebas (hasil ekstraksi PDF/Word/OCR foto,
@@ -244,16 +288,13 @@ async function poEkstrakBarisDocx(arrayBuffer) {
   const table = doc.querySelector('table');
   if (table) {
     const trs = Array.from(table.querySelectorAll('tr'));
+    const cellRows = trs.map(tr => Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim()));
     if (trs.length > 0) {
-      const headerCells = Array.from(trs[0].querySelectorAll('th,td')).map(td => td.textContent.trim());
-      const kolomMap = {};
-      headerCells.forEach((h, idx) => {
-        const field = cocokkanKolomPo(h);
-        if (field && kolomMap[field] === undefined) kolomMap[field] = idx;
-      });
+      const found = poCariBarisHeader(cellRows);
+      const dataTrs = found ? trs.slice(found.headerRowIdx + 1) : trs;
+      const kolomMap = found ? found.kolomMap : {};
+      const idxNama = found ? found.kolomMap.namaBarang : 0;
       const rows = [];
-      const dataTrs = kolomMap.namaBarang !== undefined ? trs.slice(1) : trs;
-      const idxNama = kolomMap.namaBarang !== undefined ? kolomMap.namaBarang : 0;
       dataTrs.forEach(tr => {
         const cells = Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim());
         const namaBarang = cells[idxNama] || '';
@@ -265,7 +306,8 @@ async function poEkstrakBarisDocx(arrayBuffer) {
           harga: kolomMap.harga !== undefined ? cells[kolomMap.harga] || '' : (cells[3] || ''),
         });
       });
-      if (rows.length > 0) return rows;
+      // Kalau hasilnya mencurigakan (kolom kena salah), coba jalur teks bebas dulu sebelum menyerah total.
+      if (rows.length > 0 && poHasilImportMasukAkal(rows)) return rows;
     }
   }
   const rawText = await mammoth.extractRawText({ arrayBuffer });
@@ -293,25 +335,14 @@ function poBacaBarisExcel(arrayBuffer) {
   const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
   if (rawRows.length === 0) throw new Error('File kosong atau tidak ada barisnya.');
 
-  let headerRowIdx = -1;
-  let kolomMap = {};
-  for (let i = 0; i < rawRows.length; i++) {
-    const map = {};
-    rawRows[i].forEach((cell, idx) => {
-      const field = cocokkanKolomPo(cell);
-      if (field && map[field] === undefined) map[field] = idx;
-    });
-    // Baris header tabel sungguhan selalu punya beberapa KOLOM BERBEDA yang cocok sekaligus (Nama Barang,
-    // Jumlah, Satuan, ...), bukan cuma satu — soalnya kata umum seperti "barang"/"bahan" gampang nyangkut
-    // di teks yang bukan header sama sekali (mis. judul "...Bahan Baku", atau nama menu "Pisang Barangan").
-    if (map.namaBarang !== undefined && Object.keys(map).length >= 2) { headerRowIdx = i; kolomMap = map; break; }
-  }
-  if (headerRowIdx === -1) {
+  const found = poCariBarisHeader(rawRows);
+  if (!found) {
     const headerAsli = (rawRows[0] || []).filter(Boolean).join(', ');
     throw new Error(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", "Bahan", atau "Deskripsi".`);
   }
+  const { headerRowIdx, kolomMap } = found;
 
-  return rawRows.slice(headerRowIdx + 1)
+  const rows = rawRows.slice(headerRowIdx + 1)
     .map(row => ({
       namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
       jumlah: kolomMap.jumlah !== undefined ? row[kolomMap.jumlah] : '',
@@ -320,6 +351,11 @@ function poBacaBarisExcel(arrayBuffer) {
     }))
     // Baris "Total"/"Subtotal" (umum di PO yang punya beberapa sub-tabel per tanggal kirim) bukan barang.
     .filter(r => r.namaBarang && !/^(grand\s*|sub)?total$/i.test(r.namaBarang));
+
+  if (!poHasilImportMasukAkal(rows)) {
+    throw new Error('Kolom yang terbaca sepertinya keliru (nama barang malah berisi satuan seperti "Kg"/"Pcs"). Susunan tabel di file ini tidak terbaca dengan benar — coba rapikan filenya atau isi manual.');
+  }
+  return rows;
 }
 
 /** Baca file yang dipilih (Excel/CSV, PDF, Word, atau foto JPG/PNG) dan tambahkan tiap barisnya sebagai baris barang PO — dipakai selain input manual. */
