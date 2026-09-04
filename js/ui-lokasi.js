@@ -27,6 +27,7 @@ export function watchLokasi() {
       }
     });
     names.sort((a, b) => a.localeCompare(b));
+    state.lokasiNames = names;
     document.getElementById('lokasiList').innerHTML = names.map(l => `<option value="${escapeHtml(l)}">`).join('');
   }, (err) => console.error('Gagal memuat lokasi', err));
 }

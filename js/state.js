@@ -12,6 +12,7 @@ export const state = {
   gudangUnsub: null,
   distUnsub: null,
   lokasiSet: new Set(),
+  lokasiNames: [], // sama isinya dengan lokasiSet tapi kapitalisasi asli dipertahankan (mis. "Dapur Nambo") — dipakai saat butuh nama lokasi yang bisa ditampilkan, bukan cuma dicocokkan
   lastDistItems: [],
   pembelianUnsub: null,
   lastPembelianItems: [],

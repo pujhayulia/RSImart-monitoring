@@ -251,6 +251,27 @@ function poCariNamaSppg(rows, batasBarisHeader) {
   return '';
 }
 
+// Kata umum yang muncul di banyak nama lokasi tapi bukan bagian yang membedakan satu SPPG dari yang lain
+// (mis. "Dapur Nambo" vs "Dapur Meruya" — kata "Dapur"-nya sendiri tidak spesifik) — dilewati saat
+// mencocokkan nama file ke daftar lokasi.
+const KATA_UMUM_LOKASI = new Set(['dapur', 'rumah', 'pak', 'bu', 'sppg']);
+
+/**
+ * Kalau nama SPPG tidak disebutkan sama sekali di ISI file (poCariNamaSppg gagal), coba cocokkan nama
+ * FILE-nya ke daftar lokasi yang SUDAH TERCATAT di sistem (state.lokasiNames, dari data Distribusi/PO
+ * yang sudah ada) — bukan menebak bebas dari teks nama file, cuma mencocokkan ke lokasi yang memang
+ * sudah dikenal. Dipakai karena nama file PO sering menyebut nama dapur SPPG walau isi filenya sendiri
+ * tidak (mis. "21. PO 31-04 Sep 2026 Nambo.xlsx" untuk SPPG "Dapur Nambo").
+ */
+function poCariNamaSppgDariNamaFile(namaFile) {
+  const f = normalisasiHeaderKolom(namaFile);
+  for (const namaLokasi of state.lokasiNames || []) {
+    const kataKata = namaLokasi.toLowerCase().split(/[\s/]+/).filter(w => w.length >= 3 && !KATA_UMUM_LOKASI.has(w));
+    if (kataKata.some(k => f.includes(normalisasiHeaderKolom(k)))) return namaLokasi;
+  }
+  return '';
+}
+
 /**
  * Cek apakah SATU baris (rows[i]) adalah baris header tabel barang PO — dipakai bareng oleh pembaca Excel
  * & tabel Word. Baris header harus cocok kolom Nama Barang DAN minimal satu kolom lain (Jumlah/Satuan/
@@ -608,12 +629,21 @@ async function handleImportPoExcel(e) {
       throw new Error('Tidak ada barang yang berhasil terbaca dari file ini. Coba file lain, atau isi manual.');
     }
 
+    // Kalau nama SPPG tidak ada di isi file, coba cocokkan dari nama filenya ke lokasi yang sudah dikenal
+    // sistem (lihat poCariNamaSppgDariNamaFile) sebelum menyerah ke form manual/prompt tanya nama.
+    let namaSppgDariFile = false;
+    if (!namaSppgTerdeteksi) {
+      const dariNamaFile = poCariNamaSppgDariNamaFile(file.name);
+      if (dariNamaFile) { namaSppgTerdeteksi = dariNamaFile; namaSppgDariFile = true; }
+    }
+
     const { kelompok, tanpaTanggal } = poKelompokkanPerTanggal(rows);
 
     // File dengan >=2 tanggal PO berbeda (mis. PO satu minggu penuh) TIDAK dicampur jadi satu PO — tiap
     // tanggal dibuatkan PO-nya sendiri langsung ke database, supaya jumlah/harga/tanggal tiap PO tetap benar
-    // dan tidak tertukar. Nama SPPG-nya diambil dari file (lihat poCariNamaSppg); kalau filenya sendiri
-    // tidak menyebutkannya, ditanyakan langsung — bukan ditebak dari nama file atau sumber lain.
+    // dan tidak tertukar. Nama SPPG-nya diambil dari isi file (poCariNamaSppg), atau kalau tidak ada, dari
+    // nama filenya yang dicocokkan ke lokasi yang SUDAH DIKENAL sistem (poCariNamaSppgDariNamaFile) — kalau
+    // masih belum ketemu juga, ditanyakan langsung, bukan ditebak bebas dari sumber lain.
     let namaSppgUntukSplit = namaSppgTerdeteksi;
     if (kelompok.length >= 2 && !namaSppgUntukSplit) {
       const isian = prompt(`File ini berisi ${kelompok.length} tanggal PO berbeda, tapi nama SPPG tidak disebutkan secara eksplisit di dalam file. Isi nama SPPG tujuan untuk membuat ${kelompok.length} PO otomatis (kosongkan/Batal untuk isi manual satu-satu):`, '');
@@ -625,7 +655,8 @@ async function handleImportPoExcel(e) {
       const catatanTanpaTanggal = tanpaTanggal.length > 0
         ? `\n\n${tanpaTanggal.length} barang lain tidak punya tanggal pengiriman yang jelas — akan ditambahkan ke form ini untuk diisi manual, tidak ikut dibuatkan PO otomatis.`
         : '';
-      const konfirmasi = `File ini berisi ${kelompok.length} tanggal PO berbeda untuk "${namaSppgUntukSplit}":\n${preview}${catatanTanpaTanggal}\n\nBuat ${kelompok.length} PO terpisah secara otomatis (status: Menunggu Pembelian)?`;
+      const catatanDariNamaFile = namaSppgDariFile ? '\n\n(Nama SPPG ini ditebak dari nama filenya, bukan dari isi file — pastikan sudah benar.)' : '';
+      const konfirmasi = `File ini berisi ${kelompok.length} tanggal PO berbeda untuk "${namaSppgUntukSplit}":\n${preview}${catatanTanpaTanggal}${catatanDariNamaFile}\n\nBuat ${kelompok.length} PO terpisah secara otomatis (status: Menunggu Pembelian)?`;
       if (!confirm(konfirmasi)) {
         alert('Impor dibatalkan. Tidak ada data yang ditambahkan.');
         return;
@@ -680,7 +711,7 @@ async function handleImportPoExcel(e) {
 
     const catatanTambahan = [
       tanggalTerdeteksi ? 'Tanggal PO ikut disesuaikan otomatis dari isi file.' : '',
-      namaSppgTerdeteksi ? `Tujuan/Nama SPPG ikut diisi otomatis dari file: "${namaSppgTerdeteksi}".` : '',
+      namaSppgTerdeteksi ? `Tujuan/Nama SPPG ikut diisi otomatis dari ${namaSppgDariFile ? 'nama file' : 'isi file'}: "${namaSppgTerdeteksi}"${namaSppgDariFile ? ' — cek lagi ya, ini ditebak dari nama filenya' : ''}.` : '',
       tanggalInfo,
       butuhPeriksaManual ? 'Jenis file ini dibaca otomatis dari teks/gambar (bukan tabel Excel), jadi bisa saja ada yang salah baca — mohon PERIKSA ULANG tiap baris (nama, jumlah, satuan, harga) sebelum klik Simpan PO.' : '',
     ].filter(Boolean).join('\n');
