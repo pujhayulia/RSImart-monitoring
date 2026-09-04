@@ -42,6 +42,58 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+/** Kelompokkan baris hasil impor file per tanggal — dipakai saat satu file mencakup beberapa tanggal PO
+ * sekaligus (mis. PO satu minggu penuh), supaya tiap tanggal jadi PO-nya sendiri, bukan tercampur jadi satu. */
+function poKelompokkanPerTanggal(rows) {
+  const map = new Map();
+  const tanpaTanggal = [];
+  rows.forEach(r => {
+    if (!r.tanggal) { tanpaTanggal.push(r); return; }
+    if (!map.has(r.tanggal)) map.set(r.tanggal, []);
+    map.get(r.tanggal).push(r);
+  });
+  const kelompok = [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([tanggal, items]) => ({ tanggal, items }));
+  return { kelompok, tanpaTanggal };
+}
+
+/** Buat satu PO baru (status menunggu_pembelian) per kelompok tanggal, langsung ke Firestore lewat
+ * writeBatch — dipakai saat import file berisi beberapa tanggal PO sekaligus (lihat poKelompokkanPerTanggal). */
+async function poBuatBanyakPoDariFile(kelompok, namaSppg, namaFile) {
+  let batch = writeBatch(state.db);
+  let opsInBatch = 0;
+  const flush = async () => {
+    if (opsInBatch === 0) return;
+    await batch.commit();
+    batch = writeBatch(state.db);
+    opsInBatch = 0;
+  };
+  for (const grup of kelompok) {
+    const poRef = doc(collection(state.db, 'poSppg'));
+    const items = grup.items.map((r, idx) => ({
+      namaBarang: r.namaBarang,
+      jumlah: r.jumlah === '' || r.jumlah === undefined ? null : Number(r.jumlah),
+      satuan: r.satuan || '',
+      hargaRencana: r.harga === '' || r.harga === undefined ? null : Number(r.harga),
+      hargaFinal: null,
+      itemId: `${poRef.id}-i${idx}`,
+    }));
+    batch.set(poRef, {
+      tanggalPo: grup.tanggal,
+      tujuanSppg: namaSppg,
+      items,
+      catatan: `Diimpor otomatis dari file "${namaFile}"`,
+      status: 'menunggu_pembelian',
+      distribusiId: null,
+      invoiceNomor: null,
+      createdAt: serverTimestamp(),
+      createdBy: state.currentUserEmail,
+    });
+    opsInBatch += 1;
+    if (opsInBatch >= 450) await flush();
+  }
+  await flush();
+}
+
 /** Kunci stabil untuk satu baris barang PO — dipakai Pembelian untuk menaut ke barang PO tertentu.
  * PO lama (sebelum fitur ini ada) belum punya `itemId` tersimpan, jadi jatuh ke index sebagai fallback. */
 export function poItemKey(item, index) {
@@ -341,15 +393,14 @@ async function poEkstrakBarisDocx(arrayBuffer) {
         const cells = Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim());
         const namaBarang = cells[idxNama] || '';
         if (!namaBarang) return;
-        if (kolomMap.tanggal !== undefined) {
-          const t = parseTanggalIndonesia(cells[kolomMap.tanggal]);
-          if (t) tanggalSet.add(t);
-        }
+        const tanggal = kolomMap.tanggal !== undefined ? parseTanggalIndonesia(cells[kolomMap.tanggal]) : '';
+        if (tanggal) tanggalSet.add(tanggal);
         rows.push({
           namaBarang,
           jumlah: kolomMap.jumlah !== undefined ? cells[kolomMap.jumlah] || '' : (cells[1] || ''),
           satuan: kolomMap.satuan !== undefined ? cells[kolomMap.satuan] || '' : (cells[2] || ''),
           harga: kolomMap.harga !== undefined ? cells[kolomMap.harga] || '' : (cells[3] || ''),
+          tanggal,
         });
       });
       // Kalau hasilnya mencurigakan (kolom kena salah), coba jalur teks bebas dulu sebelum menyerah total.
@@ -405,15 +456,14 @@ function poBacaBarisExcel(arrayBuffer) {
   const tanggalSet = new Set();
   const rows = rawRows.slice(headerRowIdx + 1)
     .map(row => {
-      if (kolomMap.tanggal !== undefined) {
-        const t = parseTanggalIndonesia(row[kolomMap.tanggal]);
-        if (t) tanggalSet.add(t);
-      }
+      const tanggal = kolomMap.tanggal !== undefined ? parseTanggalIndonesia(row[kolomMap.tanggal]) : '';
+      if (tanggal) tanggalSet.add(tanggal);
       return {
         namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
         jumlah: kolomMap.jumlah !== undefined ? row[kolomMap.jumlah] : '',
         satuan: kolomMap.satuan !== undefined ? String(row[kolomMap.satuan] || '').trim() : '',
         harga: kolomMap.harga !== undefined ? row[kolomMap.harga] : '',
+        tanggal,
       };
     })
     // Baris "Total"/"Subtotal" (umum di PO yang punya beberapa sub-tabel per tanggal kirim) bukan barang.
@@ -478,6 +528,49 @@ async function handleImportPoExcel(e) {
 
     if (!rows || rows.length === 0) {
       throw new Error('Tidak ada barang yang berhasil terbaca dari file ini. Coba file lain, atau isi manual.');
+    }
+
+    const { kelompok, tanpaTanggal } = poKelompokkanPerTanggal(rows);
+
+    // File dengan >=2 tanggal PO berbeda (mis. PO satu minggu penuh) TIDAK dicampur jadi satu PO — tiap
+    // tanggal dibuatkan PO-nya sendiri langsung ke database, supaya jumlah/harga/tanggal tiap PO tetap benar
+    // dan tidak tertukar. Cuma jalan kalau nama SPPG-nya juga jelas terbaca dari file (lihat poCariNamaSppg).
+    if (kelompok.length >= 2 && namaSppgTerdeteksi) {
+      const preview = kelompok.map(g => `- ${formatDate(g.tanggal)}: ${g.items.length} barang`).join('\n');
+      const catatanTanpaTanggal = tanpaTanggal.length > 0
+        ? `\n\n${tanpaTanggal.length} barang lain tidak punya tanggal pengiriman yang jelas — akan ditambahkan ke form ini untuk diisi manual, tidak ikut dibuatkan PO otomatis.`
+        : '';
+      const konfirmasi = `File ini berisi ${kelompok.length} tanggal PO berbeda untuk "${namaSppgTerdeteksi}":\n${preview}${catatanTanpaTanggal}\n\nBuat ${kelompok.length} PO terpisah secara otomatis (status: Menunggu Pembelian)?`;
+      if (!confirm(konfirmasi)) {
+        alert('Impor dibatalkan. Tidak ada data yang ditambahkan.');
+        return;
+      }
+
+      if (btn) btn.textContent = `Membuat ${kelompok.length} PO...`;
+      await poBuatBanyakPoDariFile(kelompok, namaSppgTerdeteksi, file.name);
+      logActivity({
+        action: 'tambah', modul: 'Koperasi - PO SPPG',
+        ringkasan: `Impor otomatis ${kelompok.length} PO dari file untuk ${namaSppgTerdeteksi} (${rows.length - tanpaTanggal.length} barang, ${formatDate(kelompok[0].tanggal)}–${formatDate(kelompok[kelompok.length - 1].tanggal)})`,
+      });
+
+      if (tanpaTanggal.length > 0) {
+        tanpaTanggal.forEach(r => {
+          addItemRow({
+            namaBarang: r.namaBarang,
+            jumlah: r.jumlah === '' || r.jumlah === undefined ? '' : Number(r.jumlah),
+            satuan: r.satuan || '',
+            hargaRencana: r.harga === '' || r.harga === undefined ? '' : Number(r.harga),
+          });
+        });
+      }
+
+      alert(`${kelompok.length} PO berhasil dibuat otomatis untuk "${namaSppgTerdeteksi}" (${formatDate(kelompok[0].tanggal)}–${formatDate(kelompok[kelompok.length - 1].tanggal)}). Cek daftar PO di bawah — tetap periksa isinya sebelum diproses lebih lanjut.${tanpaTanggal.length > 0 ? `\n\n${tanpaTanggal.length} barang tanpa tanggal jelas sudah ditambahkan ke form ini — isi tanggal & SPPG manual lalu Simpan PO.` : ''}${butuhPeriksaManual ? '\n\nJenis file ini dibaca otomatis dari teks/gambar, jadi bisa saja ada yang salah baca.' : ''}`);
+      return;
+    }
+
+    if (kelompok.length >= 2 && !namaSppgTerdeteksi) {
+      tanggalTerdeteksi = '';
+      tanggalInfo = `File ini berisi ${kelompok.length} tanggal PO berbeda, tapi nama SPPG tidak terdeteksi dari file sehingga tidak bisa otomatis dibuat per-PO. Semua ${rows.length} barang dimasukkan ke satu form ini — mohon pisahkan & isi tanggal/SPPG manual sesuai kebutuhan.`;
     }
 
     rows.forEach(r => {
