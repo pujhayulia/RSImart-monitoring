@@ -169,7 +169,7 @@ function resetItemRows() {
 // pengguna tidak harus persis "Nama Barang", "nama_barang" atau "Barang" saja juga kena.
 const KOLOM_PO_EXCEL = {
   namaBarang: ['namabarang', 'namabahan', 'nama', 'barang', 'bahan', 'item', 'produk', 'deskripsi'],
-  jumlah: ['jumlah', 'qty', 'quantity', 'banyak', 'qtypesan'],
+  jumlah: ['jumlah', 'qty', 'quantity', 'banyak', 'qtypesan', 'kebutuhan'],
   satuan: ['satuan', 'unit', 'uom'],
   harga: ['harga', 'hargasatuan', 'hargarencana', 'hargasatuanrencana', 'price'],
   tanggal: ['tanggalpengiriman', 'tanggalkirim', 'tglpengiriman', 'tglkirim', 'tanggalpo', 'tanggal', 'tgl'],
@@ -195,11 +195,15 @@ function cocokkanKolomPo(header) {
   return null;
 }
 
-// Nama bulan Indonesia — dipakai buat mengenali tanggal seperti "Minggu, 23 Agustus 2026" dari kolom
-// "Tanggal Pengiriman" di file PO (biasanya ditulis manual sebagai teks, bukan sel tanggal Excel asli).
-const BULAN_INDONESIA = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+// Nama & singkatan bulan Indonesia — dipakai buat mengenali tanggal seperti "Minggu, 23 Agustus 2026"
+// atau "31 Agt 2026" (banyak PO nyata nulis bulan disingkat) dari teks bebas, bukan sel tanggal Excel asli.
+const BULAN_INDONESIA_IDX = {
+  jan: 0, januari: 0, feb: 1, februari: 1, mar: 2, maret: 2, apr: 3, april: 3, mei: 4,
+  jun: 5, juni: 5, jul: 6, juli: 6, agt: 7, agu: 7, agustus: 7, sep: 8, september: 8,
+  okt: 9, oktober: 9, nov: 10, november: 10, des: 11, desember: 11,
+};
 
-/** Ubah nilai kolom tanggal (teks Indonesia atau objek Date dari Excel) jadi format ISO "YYYY-MM-DD" untuk <input type="date">. */
+/** Ubah nilai kolom tanggal (teks Indonesia, boleh disingkat, atau objek Date dari Excel) jadi format ISO "YYYY-MM-DD" untuk <input type="date">. */
 function parseTanggalIndonesia(v) {
   if (v === undefined || v === null || v === '') return '';
   if (v instanceof Date && !isNaN(v)) {
@@ -207,9 +211,22 @@ function parseTanggalIndonesia(v) {
   }
   const m = String(v).toLowerCase().match(/(\d{1,2})\s+([a-zé]+)\s+(\d{4})/);
   if (!m) return '';
-  const bulanIdx = BULAN_INDONESIA.indexOf(m[2]);
-  if (bulanIdx === -1) return '';
+  const bulanIdx = BULAN_INDONESIA_IDX[m[2]];
+  if (bulanIdx === undefined) return '';
   return `${m[3]}-${String(bulanIdx + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
+/** Cari tanggal terdekat SEBELUM suatu baris (mundur, maks 15 baris) — dipakai saat tabel tidak punya
+ * kolom Tanggal Pengiriman sendiri tapi tanggalnya ditulis sebagai judul berdiri sendiri di atas tabel
+ * (pola umum: "Senin, 31 Agt 2026" di baris tersendiri, baru baris header tabel di bawahnya). */
+function poCariTanggalTerdekatSebelum(rows, batasBarisIdx) {
+  for (let i = batasBarisIdx - 1; i >= 0 && i >= batasBarisIdx - 15; i--) {
+    for (const cell of rows[i]) {
+      const t = parseTanggalIndonesia(cell);
+      if (t) return t;
+    }
+  }
+  return '';
 }
 
 /**
@@ -235,35 +252,85 @@ function poCariNamaSppg(rows, batasBarisHeader) {
 }
 
 /**
- * Cari baris header tabel barang PO dari kumpulan baris tabel (array-of-array sel, dipakai bareng oleh
- * pembaca Excel & tabel Word). Baris header harus cocok kolom Nama Barang DAN minimal satu kolom lain
- * (Jumlah/Satuan/Harga) sekaligus — kalau cuma mengandalkan satu kata seperti "barang"/"bahan", teks biasa
- * yang kebetulan mengandung kata itu (judul dokumen "...Bahan Baku", nama menu "Pisang Barangan", dst) gampang
- * salah kejebak. Sebagai pengaman kedua, baris data pertama sesudahnya juga dicek: kalau kolom Jumlah
- * kedeteksi, isinya di baris itu harus mengandung angka — soalnya baris header sungguhan selalu langsung
- * diikuti data asli, sedangkan baris yang salah kejebak (blok menu/judul) diikuti baris teks lain juga.
+ * Cek apakah SATU baris (rows[i]) adalah baris header tabel barang PO — dipakai bareng oleh pembaca Excel
+ * & tabel Word. Baris header harus cocok kolom Nama Barang DAN minimal satu kolom lain (Jumlah/Satuan/
+ * Harga) sekaligus — kalau cuma mengandalkan satu kata seperti "barang"/"bahan", teks biasa yang kebetulan
+ * mengandung kata itu (judul dokumen "...Bahan Baku", nama menu "Pisang Barangan", dst) gampang salah
+ * kejebak. Sebagai pengaman kedua, baris data pertama sesudahnya juga dicek: kalau kolom Jumlah kedeteksi,
+ * isinya di baris itu harus mengandung angka — soalnya baris header sungguhan selalu langsung diikuti data
+ * asli, sedangkan baris yang salah kejebak (blok menu/judul) diikuti baris teks lain juga.
  */
+function poBarisAdalahHeader(rows, i) {
+  const map = {};
+  rows[i].forEach((cell, idx) => {
+    const field = cocokkanKolomPo(cell);
+    if (field && map[field] === undefined) map[field] = idx;
+  });
+  if (map.namaBarang === undefined || Object.keys(map).length < 2) return null;
+
+  let barisData = null;
+  for (let j = i + 1; j < rows.length; j++) {
+    if (rows[j].some(c => String(c ?? '').trim() !== '')) { barisData = rows[j]; break; }
+  }
+  if (!barisData) return null;
+  if (map.jumlah !== undefined) {
+    const v = barisData[map.jumlah];
+    if (v === '' || v === undefined || v === null || !/\d/.test(String(v))) return null;
+  }
+  return map;
+}
+
 function poCariBarisHeader(rows) {
   for (let i = 0; i < rows.length; i++) {
-    const map = {};
-    rows[i].forEach((cell, idx) => {
-      const field = cocokkanKolomPo(cell);
-      if (field && map[field] === undefined) map[field] = idx;
-    });
-    if (map.namaBarang === undefined || Object.keys(map).length < 2) continue;
-
-    let barisData = null;
-    for (let j = i + 1; j < rows.length; j++) {
-      if (rows[j].some(c => String(c ?? '').trim() !== '')) { barisData = rows[j]; break; }
-    }
-    if (!barisData) continue;
-    if (map.jumlah !== undefined) {
-      const v = barisData[map.jumlah];
-      if (v === '' || v === undefined || v === null || !/\d/.test(String(v))) continue;
-    }
-    return { headerRowIdx: i, kolomMap: map };
+    const map = poBarisAdalahHeader(rows, i);
+    if (map) return { headerRowIdx: i, kolomMap: map };
   }
   return null;
+}
+
+/** Baris ini masih cocok jadi data barang untuk kolomMap tertentu? Nama barang asli selalu ada hurufnya
+ * (angka murni berarti kolom lain, mis. baris tabel ringkasan porsi/anggaran); begitu juga kolom Jumlah
+ * kalau terisi harus ada angkanya. Sel kosong tetap dianggap cocok (baris Total/pemisah, disaring belakangan
+ * lewat pengecekan Nama Barang wajib terisi) — dipakai poCariSemuaBlokHeader() menentukan akhir satu blok. */
+function poBarisCocokDenganKolom(row, kolomMap) {
+  const nama = String(row[kolomMap.namaBarang] ?? '').trim();
+  if (nama && !/[a-zA-Z]/.test(nama)) return false;
+  if (kolomMap.jumlah !== undefined) {
+    const j = String(row[kolomMap.jumlah] ?? '').trim();
+    if (j && !/\d/.test(j)) return false;
+  }
+  return true;
+}
+
+/**
+ * Cari SEMUA blok tabel barang dalam satu sheet (bukan cuma yang pertama) — beberapa PO nyata punya lebih
+ * dari satu tabel barang per sheet (mis. "Menu Porsi Kecil"/"Menu Porsi Besar" masing-masing tabel sendiri
+ * untuk kelompok penerima berbeda, atau tabel ringkasan porsi/anggaran di bawah tabel barang sungguhan).
+ * Batas antar blok: baris header baru (kalau ada), ATAU baris pertama yang sudah tidak cocok lagi sebagai
+ * data untuk kolom blok ini (lihat poBarisCocokDenganKolom) — jadi baris kosong/"Total" di tengah SATU
+ * tabel logis yang sama tetap ikut (tidak memotong blok), tapi begitu masuk ke tabel lain yang bentuknya
+ * beda (mis. kolom Nama Barang isinya jadi angka semua), blok berhenti di situ. Tanggal tiap blok: dari
+ * kolom Tanggal Pengiriman kalau ada, atau kalau tidak ada kolom itu, dicari dari judul tanggal berdiri
+ * sendiri tepat di atas headernya (lihat poCariTanggalTerdekatSebelum) — pola umum saat tanggal ditulis
+ * sebagai judul, bukan per kolom.
+ */
+function poCariSemuaBlokHeader(rows) {
+  const headers = [];
+  for (let i = 0; i < rows.length; i++) {
+    const map = poBarisAdalahHeader(rows, i);
+    if (map) headers.push({ headerRowIdx: i, kolomMap: map });
+  }
+  return headers.map((h, idx) => {
+    const batasBerikutnya = idx + 1 < headers.length ? headers[idx + 1].headerRowIdx : rows.length;
+    let dataEnd = h.headerRowIdx + 1;
+    while (dataEnd < batasBerikutnya && poBarisCocokDenganKolom(rows[dataEnd], h.kolomMap)) dataEnd++;
+    return {
+      headerRowIdx: h.headerRowIdx,
+      kolomMap: h.kolomMap,
+      dataEnd,
+      tanggalBlok: h.kolomMap.tanggal !== undefined ? null : poCariTanggalTerdekatSebelum(rows, h.headerRowIdx),
+    };
+  });
 }
 
 // Satuan yang dikenali saat menebak isi baris teks bebas (PDF/Word/foto) — dipakai poParseBarisTeks().
@@ -432,47 +499,58 @@ const EKSTENSI_EXCEL = ['xlsx', 'xls', 'xlsm', 'ods', 'csv', 'xlsb'];
 
 /**
  * Banyak PO SPPG nyata punya blok judul/rencana menu di atas (nama SPPG, tanggal kirim, daftar menu harian)
- * SEBELUM tabel barang sungguhan mulai — jadi baris header tabel tidak selalu baris 1, harus dicari dulu:
- * baris pertama (dari atas) yang salah satu selnya cocok jadi kolom Nama Barang.
+ * SEBELUM tabel barang sungguhan mulai, dan sebagian malah menyebar tabel barangnya ke BEBERAPA SHEET
+ * sekaligus (satu sheet per hari, mis. "Senin"/"Selasa"/... — atau bahkan beberapa tabel per sheet untuk
+ * kelompok penerima berbeda, mis. "Menu Porsi Kecil"/"Menu Porsi Besar"). Jadi SEMUA sheet & SEMUA blok
+ * tabel dalam tiap sheet dibaca (lihat poCariSemuaBlokHeader), bukan cuma sheet/tabel pertama.
  */
 function poBacaBarisExcel(arrayBuffer) {
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  if (rawRows.length === 0) throw new Error('File kosong atau tidak ada barisnya.');
+  if (workbook.SheetNames.length === 0) throw new Error('File kosong atau tidak ada sheet-nya.');
 
-  const found = poCariBarisHeader(rawRows);
-  if (!found) {
-    const headerAsli = (rawRows[0] || []).filter(Boolean).join(', ');
-    throw new Error(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", "Bahan", atau "Deskripsi".`);
+  let namaSppgTerdeteksi = '';
+  let semuaRows = [];
+  let adaBlokTerbaca = false;
+
+  workbook.SheetNames.forEach(sheetName => {
+    const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+    if (rawRows.length === 0) return;
+    if (!namaSppgTerdeteksi) namaSppgTerdeteksi = poCariNamaSppg(rawRows, -1);
+
+    poCariSemuaBlokHeader(rawRows).forEach(blok => {
+      adaBlokTerbaca = true;
+      for (let r = blok.headerRowIdx + 1; r < blok.dataEnd; r++) {
+        const row = rawRows[r];
+        const namaBarang = String(row[blok.kolomMap.namaBarang] || '').trim();
+        if (!namaBarang) continue;
+        const tanggal = blok.kolomMap.tanggal !== undefined
+          ? parseTanggalIndonesia(row[blok.kolomMap.tanggal])
+          : (blok.tanggalBlok || '');
+        semuaRows.push({
+          namaBarang,
+          jumlah: blok.kolomMap.jumlah !== undefined ? row[blok.kolomMap.jumlah] : '',
+          satuan: blok.kolomMap.satuan !== undefined ? String(row[blok.kolomMap.satuan] || '').trim() : '',
+          harga: blok.kolomMap.harga !== undefined ? row[blok.kolomMap.harga] : '',
+          tanggal,
+        });
+      }
+    });
+  });
+
+  if (!adaBlokTerbaca) {
+    throw new Error('Kolom "Nama Barang" tidak ditemukan di file ini.\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", "Bahan", atau "Deskripsi".');
   }
-  const { headerRowIdx, kolomMap } = found;
-  const namaSppgTerdeteksi = poCariNamaSppg(rawRows, headerRowIdx);
 
-  // Kolom "Tanggal Pengiriman" (kalau ada) dicatat SEMUA tanggal berbeda yang muncul — bukan cuma baris
-  // pertama — karena satu file PO nyata bisa mencakup beberapa tanggal pengiriman sekaligus (satu minggu
-  // penuh, mis.). Tanggal PO cuma diisi otomatis kalau isi filenya memang cuma satu tanggal yang jelas;
-  // kalau ada beberapa, itu bukan hal yang boleh ditebak sendiri — dikasih tahu ke pengguna untuk diisi manual.
-  const tanggalSet = new Set();
-  const rows = rawRows.slice(headerRowIdx + 1)
-    .map(row => {
-      const tanggal = kolomMap.tanggal !== undefined ? parseTanggalIndonesia(row[kolomMap.tanggal]) : '';
-      if (tanggal) tanggalSet.add(tanggal);
-      return {
-        namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
-        jumlah: kolomMap.jumlah !== undefined ? row[kolomMap.jumlah] : '',
-        satuan: kolomMap.satuan !== undefined ? String(row[kolomMap.satuan] || '').trim() : '',
-        harga: kolomMap.harga !== undefined ? row[kolomMap.harga] : '',
-        tanggal,
-      };
-    })
-    // Baris "Total"/"Subtotal" (umum di PO yang punya beberapa sub-tabel per tanggal kirim) bukan barang.
-    .filter(r => r.namaBarang && !/^(grand\s*|sub)?total$/i.test(r.namaBarang));
-
+  // Baris "Total"/"Subtotal" (umum di PO yang punya beberapa sub-tabel per tanggal kirim) bukan barang.
+  const rows = semuaRows.filter(r => r.namaBarang && !/^(grand\s*|sub)?total$/i.test(r.namaBarang));
   if (!poHasilImportMasukAkal(rows)) {
     throw new Error('Kolom yang terbaca sepertinya keliru (nama barang malah berisi satuan seperti "Kg"/"Pcs"). Susunan tabel di file ini tidak terbaca dengan benar — coba rapikan filenya atau isi manual.');
   }
 
+  // Tanggal PO cuma diisi otomatis kalau isi filenya memang cuma satu tanggal yang jelas; kalau ada
+  // beberapa (satu minggu penuh, mis.), itu bukan hal yang boleh ditebak sendiri — dikasih tahu ke
+  // pengguna lewat tanggalInfo, dan handleImportPoExcel akan menawarkan bikin PO terpisah per tanggal.
+  const tanggalSet = new Set(rows.map(r => r.tanggal).filter(Boolean));
   let tanggalTerdeteksi = '';
   let tanggalInfo = '';
   if (tanggalSet.size === 1) {
@@ -534,23 +612,30 @@ async function handleImportPoExcel(e) {
 
     // File dengan >=2 tanggal PO berbeda (mis. PO satu minggu penuh) TIDAK dicampur jadi satu PO — tiap
     // tanggal dibuatkan PO-nya sendiri langsung ke database, supaya jumlah/harga/tanggal tiap PO tetap benar
-    // dan tidak tertukar. Cuma jalan kalau nama SPPG-nya juga jelas terbaca dari file (lihat poCariNamaSppg).
-    if (kelompok.length >= 2 && namaSppgTerdeteksi) {
+    // dan tidak tertukar. Nama SPPG-nya diambil dari file (lihat poCariNamaSppg); kalau filenya sendiri
+    // tidak menyebutkannya, ditanyakan langsung — bukan ditebak dari nama file atau sumber lain.
+    let namaSppgUntukSplit = namaSppgTerdeteksi;
+    if (kelompok.length >= 2 && !namaSppgUntukSplit) {
+      const isian = prompt(`File ini berisi ${kelompok.length} tanggal PO berbeda, tapi nama SPPG tidak disebutkan secara eksplisit di dalam file. Isi nama SPPG tujuan untuk membuat ${kelompok.length} PO otomatis (kosongkan/Batal untuk isi manual satu-satu):`, '');
+      if (isian && isian.trim()) namaSppgUntukSplit = isian.trim();
+    }
+
+    if (kelompok.length >= 2 && namaSppgUntukSplit) {
       const preview = kelompok.map(g => `- ${formatDate(g.tanggal)}: ${g.items.length} barang`).join('\n');
       const catatanTanpaTanggal = tanpaTanggal.length > 0
         ? `\n\n${tanpaTanggal.length} barang lain tidak punya tanggal pengiriman yang jelas — akan ditambahkan ke form ini untuk diisi manual, tidak ikut dibuatkan PO otomatis.`
         : '';
-      const konfirmasi = `File ini berisi ${kelompok.length} tanggal PO berbeda untuk "${namaSppgTerdeteksi}":\n${preview}${catatanTanpaTanggal}\n\nBuat ${kelompok.length} PO terpisah secara otomatis (status: Menunggu Pembelian)?`;
+      const konfirmasi = `File ini berisi ${kelompok.length} tanggal PO berbeda untuk "${namaSppgUntukSplit}":\n${preview}${catatanTanpaTanggal}\n\nBuat ${kelompok.length} PO terpisah secara otomatis (status: Menunggu Pembelian)?`;
       if (!confirm(konfirmasi)) {
         alert('Impor dibatalkan. Tidak ada data yang ditambahkan.');
         return;
       }
 
       if (btn) btn.textContent = `Membuat ${kelompok.length} PO...`;
-      await poBuatBanyakPoDariFile(kelompok, namaSppgTerdeteksi, file.name);
+      await poBuatBanyakPoDariFile(kelompok, namaSppgUntukSplit, file.name);
       logActivity({
         action: 'tambah', modul: 'Koperasi - PO SPPG',
-        ringkasan: `Impor otomatis ${kelompok.length} PO dari file untuk ${namaSppgTerdeteksi} (${rows.length - tanpaTanggal.length} barang, ${formatDate(kelompok[0].tanggal)}–${formatDate(kelompok[kelompok.length - 1].tanggal)})`,
+        ringkasan: `Impor otomatis ${kelompok.length} PO dari file untuk ${namaSppgUntukSplit} (${rows.length - tanpaTanggal.length} barang, ${formatDate(kelompok[0].tanggal)}–${formatDate(kelompok[kelompok.length - 1].tanggal)})`,
       });
 
       if (tanpaTanggal.length > 0) {
@@ -564,13 +649,13 @@ async function handleImportPoExcel(e) {
         });
       }
 
-      alert(`${kelompok.length} PO berhasil dibuat otomatis untuk "${namaSppgTerdeteksi}" (${formatDate(kelompok[0].tanggal)}–${formatDate(kelompok[kelompok.length - 1].tanggal)}). Cek daftar PO di bawah — tetap periksa isinya sebelum diproses lebih lanjut.${tanpaTanggal.length > 0 ? `\n\n${tanpaTanggal.length} barang tanpa tanggal jelas sudah ditambahkan ke form ini — isi tanggal & SPPG manual lalu Simpan PO.` : ''}${butuhPeriksaManual ? '\n\nJenis file ini dibaca otomatis dari teks/gambar, jadi bisa saja ada yang salah baca.' : ''}`);
+      alert(`${kelompok.length} PO berhasil dibuat otomatis untuk "${namaSppgUntukSplit}" (${formatDate(kelompok[0].tanggal)}–${formatDate(kelompok[kelompok.length - 1].tanggal)}). Cek daftar PO di bawah — tetap periksa isinya sebelum diproses lebih lanjut.${tanpaTanggal.length > 0 ? `\n\n${tanpaTanggal.length} barang tanpa tanggal jelas sudah ditambahkan ke form ini — isi tanggal & SPPG manual lalu Simpan PO.` : ''}${butuhPeriksaManual ? '\n\nJenis file ini dibaca otomatis dari teks/gambar, jadi bisa saja ada yang salah baca.' : ''}`);
       return;
     }
 
-    if (kelompok.length >= 2 && !namaSppgTerdeteksi) {
+    if (kelompok.length >= 2 && !namaSppgUntukSplit) {
       tanggalTerdeteksi = '';
-      tanggalInfo = `File ini berisi ${kelompok.length} tanggal PO berbeda, tapi nama SPPG tidak terdeteksi dari file sehingga tidak bisa otomatis dibuat per-PO. Semua ${rows.length} barang dimasukkan ke satu form ini — mohon pisahkan & isi tanggal/SPPG manual sesuai kebutuhan.`;
+      tanggalInfo = `File ini berisi ${kelompok.length} tanggal PO berbeda, tapi nama SPPG tidak diisi sehingga tidak bisa otomatis dibuat per-PO. Semua ${rows.length} barang dimasukkan ke satu form ini — mohon pisahkan & isi tanggal/SPPG manual sesuai kebutuhan.`;
     }
 
     rows.forEach(r => {
