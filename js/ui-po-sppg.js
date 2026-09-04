@@ -282,30 +282,46 @@ async function poEkstrakTeksGambar(file, onProgress) {
 
 const EKSTENSI_EXCEL = ['xlsx', 'xls', 'xlsm', 'ods', 'csv', 'xlsb'];
 
+/**
+ * Banyak PO SPPG nyata punya blok judul/rencana menu di atas (nama SPPG, tanggal kirim, daftar menu harian)
+ * SEBELUM tabel barang sungguhan mulai — jadi baris header tabel tidak selalu baris 1, harus dicari dulu:
+ * baris pertama (dari atas) yang salah satu selnya cocok jadi kolom Nama Barang.
+ */
 function poBacaBarisExcel(arrayBuffer) {
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
   if (rawRows.length === 0) throw new Error('File kosong atau tidak ada barisnya.');
 
-  const kolomMap = {};
-  Object.keys(rawRows[0]).forEach(header => {
-    const field = cocokkanKolomPo(header);
-    if (field) kolomMap[field] = header;
-  });
-  if (!kolomMap.namaBarang) {
-    const headerAsli = Object.keys(rawRows[0]).join(', ');
-    throw new Error(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", atau "Bahan".`);
+  let headerRowIdx = -1;
+  let kolomMap = {};
+  for (let i = 0; i < rawRows.length; i++) {
+    // Baris cuma 1 sel terisi (mis. judul dokumen yang di-merge) gampang salah kejebak — kata "Bahan"
+    // di judul seperti "Purchasing Plan Bahan Baku" ikut cocok alias "Nama Bahan". Baris header tabel
+    // sungguhan selalu punya beberapa kolom terisi, jadi baris 1-sel dilewati.
+    const isiTerisi = rawRows[i].filter(c => String(c ?? '').trim() !== '').length;
+    if (isiTerisi < 2) continue;
+    const map = {};
+    rawRows[i].forEach((cell, idx) => {
+      const field = cocokkanKolomPo(cell);
+      if (field && map[field] === undefined) map[field] = idx;
+    });
+    if (map.namaBarang !== undefined) { headerRowIdx = i; kolomMap = map; break; }
+  }
+  if (headerRowIdx === -1) {
+    const headerAsli = (rawRows[0] || []).filter(Boolean).join(', ');
+    throw new Error(`Kolom "Nama Barang" tidak ditemukan di file ini.\n\nHeader yang terbaca dari file: ${headerAsli || '(tidak ada)'}\n\nPastikan ada kolom dengan header seperti "Nama Barang", "Barang", "Bahan", atau "Deskripsi".`);
   }
 
-  return rawRows
+  return rawRows.slice(headerRowIdx + 1)
     .map(row => ({
       namaBarang: String(row[kolomMap.namaBarang] || '').trim(),
-      jumlah: kolomMap.jumlah ? row[kolomMap.jumlah] : '',
-      satuan: kolomMap.satuan ? String(row[kolomMap.satuan] || '').trim() : '',
-      harga: kolomMap.harga ? row[kolomMap.harga] : '',
+      jumlah: kolomMap.jumlah !== undefined ? row[kolomMap.jumlah] : '',
+      satuan: kolomMap.satuan !== undefined ? String(row[kolomMap.satuan] || '').trim() : '',
+      harga: kolomMap.harga !== undefined ? row[kolomMap.harga] : '',
     }))
-    .filter(r => r.namaBarang);
+    // Baris "Total"/"Subtotal" (umum di PO yang punya beberapa sub-tabel per tanggal kirim) bukan barang.
+    .filter(r => r.namaBarang && !/^(grand\s*|sub)?total$/i.test(r.namaBarang));
 }
 
 /** Baca file yang dipilih (Excel/CSV, PDF, Word, atau foto JPG/PNG) dan tambahkan tiap barisnya sebagai baris barang PO — dipakai selain input manual. */
