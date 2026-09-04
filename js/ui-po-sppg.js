@@ -296,17 +296,15 @@ function poBacaBarisExcel(arrayBuffer) {
   let headerRowIdx = -1;
   let kolomMap = {};
   for (let i = 0; i < rawRows.length; i++) {
-    // Baris cuma 1 sel terisi (mis. judul dokumen yang di-merge) gampang salah kejebak — kata "Bahan"
-    // di judul seperti "Purchasing Plan Bahan Baku" ikut cocok alias "Nama Bahan". Baris header tabel
-    // sungguhan selalu punya beberapa kolom terisi, jadi baris 1-sel dilewati.
-    const isiTerisi = rawRows[i].filter(c => String(c ?? '').trim() !== '').length;
-    if (isiTerisi < 2) continue;
     const map = {};
     rawRows[i].forEach((cell, idx) => {
       const field = cocokkanKolomPo(cell);
       if (field && map[field] === undefined) map[field] = idx;
     });
-    if (map.namaBarang !== undefined) { headerRowIdx = i; kolomMap = map; break; }
+    // Baris header tabel sungguhan selalu punya beberapa KOLOM BERBEDA yang cocok sekaligus (Nama Barang,
+    // Jumlah, Satuan, ...), bukan cuma satu — soalnya kata umum seperti "barang"/"bahan" gampang nyangkut
+    // di teks yang bukan header sama sekali (mis. judul "...Bahan Baku", atau nama menu "Pisang Barangan").
+    if (map.namaBarang !== undefined && Object.keys(map).length >= 2) { headerRowIdx = i; kolomMap = map; break; }
   }
   if (headerRowIdx === -1) {
     const headerAsli = (rawRows[0] || []).filter(Boolean).join(', ');
