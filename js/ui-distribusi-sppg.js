@@ -10,13 +10,13 @@ import { KOPERASI_INFO, cariAlamatSppg } from './data.js';
 import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
-import { printReport } from './print-report.js';
+import { printReport, simpanSebagaiGambar } from './print-report.js';
 import { markPoTerkirim } from './ui-po-sppg.js';
 
 const LOGO_URL = 'assets/invoice/logo-koperasi.png';
 const STEMPEL_URL = 'assets/invoice/stempel-koperasi.png';
-const TTD_URL = 'assets/invoice/ttd-koperasi.jpg';
-const TTD_MARGI_URL = 'assets/invoice/ttd-margi.jpg';
+const TTD_URL = 'assets/invoice/ttd-koperasi.png';
+const TTD_MARGI_URL = 'assets/invoice/ttd-margi.png';
 
 /** Tanda tangan asli per nama pengirim, dipakai di kolom "Pengirim" Surat Jalan — kalau namanya tidak ada di sini, kolomnya dikosongkan untuk ditandatangani manual. Stempel koperasi cuma dipasangkan ke Ghufron karena dialah penanda tangan resminya. */
 const TTD_PENGIRIM = {
@@ -292,6 +292,7 @@ function suratJalanFormHtml(nota) {
       ${groupsHtml}
       <div class="po-inline-form-actions">
         <button type="button" class="btn-ghost" data-suratjalan-cancel="${nota.id}">Batal</button>
+        <button type="button" class="btn-ghost" data-suratjalan-submit-gambar="${nota.id}">🖼️ Simpan Gambar</button>
         <button type="button" class="btn" data-suratjalan-submit="${nota.id}">${nota.suratJalanNomor ? `Cetak Ulang${groups.length > 1 ? ` (${groups.length})` : ''}` : label}</button>
       </div>
     </div>`;
@@ -302,7 +303,7 @@ function suratJalanFormHtml(nota) {
  * ulang memakai nomor yang sama, bukan bikin baru. Kalau barangnya kepecah ke beberapa pengirim, nomornya
  * tetap satu (satu nota = satu nomor) tapi dicetak jadi beberapa halaman, satu halaman per pengirim.
  */
-async function submitSuratJalan(notaId) {
+async function submitSuratJalan(notaId, mode) {
   const nota = state.lastDistribusiSppgItems.find(n => n.id === notaId);
   if (!nota) return;
   const groups = kelompokkanPerPengirim(nota).map((g, idx) => {
@@ -339,7 +340,7 @@ async function submitSuratJalan(notaId) {
   }
 
   suratJalanExpandId = null;
-  printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat }, groups);
+  printSuratJalanBody({ ...nota, suratJalanNomor: nomor, suratJalanTanggal: tanggalSurat }, groups, mode);
 }
 
 const SURAT_JALAN_MIN_BARIS = 10; // baris kosong ditambahkan sampai minimal segini, meniru formulir cetak koperasi
@@ -408,9 +409,11 @@ function suratJalanPageHtml(nota, pengirim, items, needsPageBreak) {
 }
 
 /** Satu nota bisa dicetak jadi beberapa Surat Jalan (satu halaman per pengirim) dalam satu kali cetak. */
-function printSuratJalanBody(nota, groups) {
+function printSuratJalanBody(nota, groups, mode) {
   const body = groups.map((g, idx) => suratJalanPageHtml(nota, g.pengirim, g.items, idx > 0)).join('');
-  printReport(body, `SuratJalan-${slugifyTujuan(nota.tujuanSppg)}-${fileDateTag(nota.tanggalKirim)}`);
+  const filename = `SuratJalan-${slugifyTujuan(nota.tujuanSppg)}-${fileDateTag(nota.tanggalKirim)}`;
+  if (mode === 'gambar') simpanSebagaiGambar(body, filename);
+  else printReport(body, filename);
 }
 
 export function renderDistribusiSppg() {
@@ -486,6 +489,9 @@ export function renderDistribusiSppg() {
   });
   logEl.querySelectorAll('[data-suratjalan-submit]').forEach(btn => {
     btn.addEventListener('click', () => submitSuratJalan(btn.dataset.suratjalanSubmit));
+  });
+  logEl.querySelectorAll('[data-suratjalan-submit-gambar]').forEach(btn => {
+    btn.addEventListener('click', () => submitSuratJalan(btn.dataset.suratjalanSubmitGambar, 'gambar'));
   });
   logEl.querySelectorAll('button.edit-btn').forEach(btn => {
     btn.addEventListener('click', () => {

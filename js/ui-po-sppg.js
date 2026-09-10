@@ -14,7 +14,7 @@ import { KOPERASI_INFO } from './data.js';
 import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, escapeHtml, todayIso, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
-import { printReport } from './print-report.js';
+import { printReport, simpanSebagaiGambar } from './print-report.js';
 import { navigateTo } from './router.js';
 import { MARGIN_LAMA_BATCH, MARGIN_LAMA_DATA } from './margin-lama-data.js';
 
@@ -23,7 +23,7 @@ const OLD_PO_LAMA_BATCH = 'arsip-po-2026-08';
 
 const LOGO_URL = 'assets/invoice/logo-koperasi.png';
 const STEMPEL_URL = 'assets/invoice/stempel-koperasi.png';
-const TTD_URL = 'assets/invoice/ttd-koperasi.jpg';
+const TTD_URL = 'assets/invoice/ttd-koperasi.png';
 
 /** "Dapur SPPG Sudimara Jaya" -> "Dapur_SPPG_Sudimara_Jaya" — dipakai untuk nama file unduhan. */
 function slugifyTujuan(tujuan) {
@@ -36,6 +36,13 @@ function fileDateTag(iso) {
   const [y, m, d] = iso.split('-');
   const bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   return `${d}${bulan[parseInt(m, 10) - 1]}${y}`;
+}
+
+/** Keluarkan dokumen cetak sebagai PDF (lewat dialog Print browser) atau PNG, tergantung `mode` —
+ * dipakai bareng oleh Konfirmasi/Persetujuan Harga & Invoice supaya tiap dokumen tidak perlu duplikat logika ini. */
+function keluarkanDokumen(body, filename, mode) {
+  if (mode === 'gambar') simpanSebagaiGambar(body, filename);
+  else printReport(body, filename);
 }
 
 function genId() {
@@ -1161,6 +1168,7 @@ function renderInlineForm(po) {
         </div>
         <div class="po-inline-form-actions">
           <button type="button" class="btn-ghost" data-po-cancel-invoice="${po.id}">Batal</button>
+          <button type="button" class="btn-ghost" data-po-submit-invoice-gambar="${po.id}">🖼️ Simpan Gambar</button>
           <button type="button" class="btn" data-po-submit-invoice="${po.id}">${po.invoiceNomor ? 'Cetak Ulang Invoice' : 'Cetak Invoice'}</button>
         </div>
       </div>`;
@@ -1177,10 +1185,12 @@ function renderActions(po) {
     }
   } else if (po.status === 'menunggu_persetujuan') {
     actions.push(`<button type="button" class="btn-ghost" data-po-print-konfirmasi="${po.id}">Cetak Konfirmasi Harga (PDF)</button>`);
+    actions.push(`<button type="button" class="btn-ghost" data-po-gambar-konfirmasi="${po.id}">🖼️ Simpan Gambar</button>`);
     actions.push(`<button type="button" class="btn-ghost" data-po-reject="${po.id}">SPPG Menolak</button>`);
     actions.push(`<button type="button" class="btn" data-po-approve="${po.id}">SPPG Setuju</button>`);
   } else if (po.status === 'disetujui') {
     actions.push(`<button type="button" class="btn-ghost" data-po-print-persetujuan="${po.id}">Cetak Persetujuan Harga (PDF)</button>`);
+    actions.push(`<button type="button" class="btn-ghost" data-po-gambar-persetujuan="${po.id}">🖼️ Simpan Gambar</button>`);
     actions.push(`<button type="button" class="btn" data-po-buat-nota="${po.id}">Buat Nota Pengiriman →</button>`);
   } else if (po.status === 'terkirim') {
     if (invoiceExpandId !== po.id) {
@@ -1220,8 +1230,11 @@ function wireCardActions(root) {
     renderPoSppg();
   }));
   root.querySelectorAll('[data-po-submit-invoice]').forEach(btn => btn.addEventListener('click', () => cetakInvoice(btn.dataset.poSubmitInvoice)));
+  root.querySelectorAll('[data-po-submit-invoice-gambar]').forEach(btn => btn.addEventListener('click', () => cetakInvoice(btn.dataset.poSubmitInvoiceGambar, 'gambar')));
   root.querySelectorAll('[data-po-print-konfirmasi]').forEach(btn => btn.addEventListener('click', () => cetakKonfirmasiHarga(btn.dataset.poPrintKonfirmasi)));
+  root.querySelectorAll('[data-po-gambar-konfirmasi]').forEach(btn => btn.addEventListener('click', () => cetakKonfirmasiHarga(btn.dataset.poGambarKonfirmasi, 'gambar')));
   root.querySelectorAll('[data-po-print-persetujuan]').forEach(btn => btn.addEventListener('click', () => cetakPersetujuanHarga(btn.dataset.poPrintPersetujuan)));
+  root.querySelectorAll('[data-po-gambar-persetujuan]').forEach(btn => btn.addEventListener('click', () => cetakPersetujuanHarga(btn.dataset.poGambarPersetujuan, 'gambar')));
   root.querySelectorAll('[data-po-delete]').forEach(btn => btn.addEventListener('click', () => deletePo(btn.dataset.poDelete)));
 }
 
@@ -1290,7 +1303,7 @@ function nextInvoiceNomor(year) {
   return `${prefix}${String(max + 1).padStart(4, '0')}`;
 }
 
-async function cetakInvoice(poId) {
+async function cetakInvoice(poId, mode) {
   const po = state.lastPoSppgItems.find(p => p.id === poId);
   if (!po) return;
   const potonganInput = document.getElementById(`poInvoicePotongan-${poId}`);
@@ -1314,11 +1327,11 @@ async function cetakInvoice(poId) {
     return;
   }
 
-  printInvoiceBody({ ...po, invoiceNomor: nomor, invoiceTanggal: tanggalInvoice, invoicePotongan: potongan, invoicePpn: ppn });
+  printInvoiceBody({ ...po, invoiceNomor: nomor, invoiceTanggal: tanggalInvoice, invoicePotongan: potongan, invoicePpn: ppn }, mode);
   invoiceExpandId = null;
 }
 
-function cetakKonfirmasiHarga(poId) {
+function cetakKonfirmasiHarga(poId, mode) {
   const po = state.lastPoSppgItems.find(p => p.id === poId);
   if (!po) return;
   const items = po.items || [];
@@ -1386,10 +1399,10 @@ function cetakKonfirmasiHarga(poId) {
       </div>
     </div>
   `;
-  printReport(body, `Konfirmasi-${slugifyTujuan(po.tujuanSppg)}-${fileDateTag(po.tanggalPo)}`);
+  keluarkanDokumen(body, `Konfirmasi-${slugifyTujuan(po.tujuanSppg)}-${fileDateTag(po.tanggalPo)}`, mode);
 }
 
-function cetakPersetujuanHarga(poId) {
+function cetakPersetujuanHarga(poId, mode) {
   const po = state.lastPoSppgItems.find(p => p.id === poId);
   if (!po) return;
   const items = po.items || [];
@@ -1432,10 +1445,10 @@ function cetakPersetujuanHarga(poId) {
       </div>
     </div>
   `;
-  printReport(body, `Persetujuan-${slugifyTujuan(po.tujuanSppg)}-${fileDateTag(po.tanggalPo)}`);
+  keluarkanDokumen(body, `Persetujuan-${slugifyTujuan(po.tujuanSppg)}-${fileDateTag(po.tanggalPo)}`, mode);
 }
 
-function printInvoiceBody(po) {
+function printInvoiceBody(po, mode) {
   const items = po.items || [];
   const rows = items.map((it, i) => `
     <tr>
@@ -1493,7 +1506,7 @@ function printInvoiceBody(po) {
     </div>
     <div class="invoice-bottom-rule"></div>
   `;
-  printReport(body, `Invoice-${slugifyTujuan(po.tujuanSppg)}-${fileDateTag(po.invoiceTanggal)}`);
+  keluarkanDokumen(body, `Invoice-${slugifyTujuan(po.tujuanSppg)}-${fileDateTag(po.invoiceTanggal)}`, mode);
 }
 
 async function deletePo(id) {
