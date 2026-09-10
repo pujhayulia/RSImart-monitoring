@@ -1163,9 +1163,11 @@ function renderInlineForm(po) {
       <div class="po-inline-form" data-form="invoice">
         <h4>Detail sebelum cetak Invoice/Berita Acara:</h4>
         <div class="po-invoice-fields">
+          <label>Nomor Invoice<input type="text" id="poInvoiceNomor-${po.id}" value="${escapeHtml(po.invoiceNomor || nextInvoiceNomor((po.invoiceTanggal || todayIso()).slice(0, 4)))}"></label>
           <label>Potongan (%)<input type="number" step="0.1" id="poInvoicePotongan-${po.id}" value="${po.invoicePotongan ?? 0}"></label>
           <label>PPN (%)<input type="number" step="0.1" id="poInvoicePpn-${po.id}" value="${po.invoicePpn ?? 0}"></label>
         </div>
+        <div class="shared-note">Nomor invoice ini bisa diubah manual (mis. menyesuaikan urutan nomor yang sudah dipakai sebelumnya) — kosongkan untuk kembali ke otomatis.</div>
         <div class="po-inline-form-actions">
           <button type="button" class="btn-ghost" data-po-cancel-invoice="${po.id}">Batal</button>
           <button type="button" class="btn-ghost" data-po-submit-invoice-gambar="${po.id}">🖼️ Simpan Gambar</button>
@@ -1308,10 +1310,17 @@ async function cetakInvoice(poId, mode) {
   if (!po) return;
   const potonganInput = document.getElementById(`poInvoicePotongan-${poId}`);
   const ppnInput = document.getElementById(`poInvoicePpn-${poId}`);
+  const nomorInput = document.getElementById(`poInvoiceNomor-${poId}`);
   const potongan = potonganInput ? Number(potonganInput.value || 0) : (po.invoicePotongan || 0);
   const ppn = ppnInput ? Number(ppnInput.value || 0) : (po.invoicePpn || 0);
   const tanggalInvoice = po.invoiceTanggal || todayIso();
-  const nomor = po.invoiceNomor || nextInvoiceNomor(tanggalInvoice.slice(0, 4));
+  const nomorIsian = nomorInput ? nomorInput.value.trim() : '';
+  const nomor = nomorIsian || po.invoiceNomor || nextInvoiceNomor(tanggalInvoice.slice(0, 4));
+
+  const dipakaiPoLain = state.lastPoSppgItems.find(p => p.id !== poId && p.invoiceNomor === nomor);
+  if (dipakaiPoLain && !confirm(`Nomor invoice "${nomor}" sudah dipakai PO untuk ${dipakaiPoLain.tujuanSppg}. Tetap pakai nomor ini juga?`)) {
+    return;
+  }
 
   try {
     await updateDoc(doc(state.db, 'poSppg', poId), {
@@ -1320,6 +1329,8 @@ async function cetakInvoice(poId, mode) {
     });
     if (!po.invoiceNomor) {
       logActivity({ action: 'ubah', modul: 'Koperasi - PO SPPG', ringkasan: `Cetak Invoice ${nomor} untuk PO ${po.tujuanSppg}` });
+    } else if (po.invoiceNomor !== nomor) {
+      logActivity({ action: 'ubah', modul: 'Koperasi - PO SPPG', ringkasan: `Ubah nomor Invoice PO ${po.tujuanSppg} dari ${po.invoiceNomor} jadi ${nomor}` });
     }
   } catch (e) {
     console.error(e);
