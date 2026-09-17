@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { produkById, produkLabel, PRODUK } from './data.js';
 import { formatDate, formatRupiah, escapeHtml } from './utils.js';
 import { logActivity } from './activity-log.js';
+import { cetakInvoicePengiriman } from './ui-invoice-rsi.js';
 
 function findDistItem(id) {
   return state.lastDistItems.find(it => it.id === id);
@@ -96,6 +97,8 @@ export function renderDistItemHtml(it, opts = {}) {
         ${amount}
         <div class="dist-item-actions">
           ${payAction}
+          <button class="btn-ghost invoice-btn" data-invoiceid="${it.id}" title="Cetak Invoice pengiriman ini">${it.invoiceNomor ? '📄 Cetak Ulang Invoice' : '📄 Cetak Invoice'}</button>
+          <button class="btn-ghost invoice-gambar-btn" data-invoicegambarid="${it.id}" title="Simpan Invoice sebagai gambar PNG">🖼️</button>
           <button class="edit-btn" data-editid="${it.id}" title="Edit catatan ini">✏️</button>
           <button class="del-btn" data-delid="${it.id}" title="Hapus catatan ini">🗑</button>
         </div>
@@ -120,5 +123,11 @@ export function wireDistItemActions(containerEl) {
       const item = findDistItem(btn.dataset.editid);
       if (item && onEditCb) onEditCb(item);
     });
+  });
+  containerEl.querySelectorAll('button.invoice-btn').forEach(btn => {
+    btn.addEventListener('click', () => cetakInvoicePengiriman(btn.dataset.invoiceid));
+  });
+  containerEl.querySelectorAll('button.invoice-gambar-btn').forEach(btn => {
+    btn.addEventListener('click', () => cetakInvoicePengiriman(btn.dataset.invoicegambarid, 'gambar'));
   });
 }

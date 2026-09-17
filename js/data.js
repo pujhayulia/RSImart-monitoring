@@ -30,6 +30,22 @@ export const KOPERASI_INFO = {
   penandaTangan: 'Muh.Ghufron',
 };
 
+/** Kop surat & info rekening Air ARSI (Yayasan Rumah Sehat Indonesia) — dipakai untuk cetak Invoice
+ * pengiriman. Alamat/rekening/penanggung jawab sama dengan Koperasi (satu yayasan, satu rekening
+ * operasional) per konfirmasi Pujha — cuma nama & warna dokumennya beda supaya tidak tertukar sama
+ * Invoice Koperasi (lihat KOPERASI_INFO). */
+export const YAYASAN_INFO = {
+  nama: 'Yayasan Rumah Sehat Indonesia',
+  namaSingkat: 'Air ARSI',
+  alamatBaris: KOPERASI_INFO.alamatBaris,
+  alamat: KOPERASI_INFO.alamat,
+  kota: KOPERASI_INFO.kota,
+  bankNama: KOPERASI_INFO.bankNama,
+  bankRekening: KOPERASI_INFO.bankRekening,
+  bankAtasNama: KOPERASI_INFO.bankAtasNama,
+  penandaTangan: KOPERASI_INFO.penandaTangan,
+};
+
 /**
  * Alamat dapur SPPG — dipakai untuk menampilkan alamat penerima di Surat Jalan. Kunci = kata kunci
  * (huruf kecil) yang dicari di dalam nama tujuan SPPG, supaya cocok walau nama persisnya beda-beda

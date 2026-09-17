@@ -6,7 +6,7 @@ import { state } from './state.js';
 
 export const MODULES = {
   rsi: {
-    label: 'Web RSI',
+    label: 'Air ARSI',
     pages: {
       beranda: 'Beranda',
       katalog: 'Katalog Produk',

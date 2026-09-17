@@ -105,7 +105,7 @@
       <div class="module-select-grid">
         <button type="button" class="module-card js-module-pick" data-module="rsi">
           <span class="module-card-icon">💧</span>
-          <span class="module-card-title">Web RSI</span>
+          <span class="module-card-title">Air ARSI</span>
           <span class="module-card-desc">Katalog produk, stok Gudang RSI, distribusi pengiriman, dan rekap keuangan.</span>
         </button>
         <button type="button" class="module-card js-module-pick" data-module="koperasi">
@@ -166,10 +166,10 @@
       <div class="sidebar-brand">
         <div class="brand-chip chip-green">RSI</div>
         <div class="brand-chip chip-teal">💧</div>
-        <span class="sidebar-brand-text js-module-label">Web RSI</span>
+        <span class="sidebar-brand-text js-module-label">Air ARSI</span>
       </div>
 
-      <nav class="sidebar-nav" data-module="rsi" aria-label="Navigasi Web RSI">
+      <nav class="sidebar-nav" data-module="rsi" aria-label="Navigasi Air ARSI">
         <a href="#/rsi/beranda" class="sidebar-link" data-module="rsi" data-page="beranda"><span class="sidebar-link-icon">🏠</span>Beranda</a>
         <a href="#/rsi/katalog" class="sidebar-link" data-module="rsi" data-page="katalog"><span class="sidebar-link-icon">📦</span>Katalog Produk</a>
         <a href="#/rsi/gudang" class="sidebar-link" data-module="rsi" data-page="gudang"><span class="sidebar-link-icon">🏬</span>Stok Gudang RSI</a>
@@ -364,6 +364,11 @@
             <div class="dist-form">
               <h3>Catat Pengiriman Baru</h3>
               <p class="tip">Pilih lokasi yang sudah ada, atau ketik tujuan baru — otomatis tersimpan.</p>
+              <div class="po-item-add-row">
+                <button type="button" class="btn-ghost" id="btnImportDistribusi">📄 Impor dari File</button>
+              </div>
+              <input type="file" id="inputImportDistribusi" title="Impor pengiriman dari file" accept=".xlsx,.xls,.xlsm,.ods,.csv" class="hidden">
+              <div class="shared-note">Bisa impor banyak pengiriman sekaligus dari Excel/CSV (kolom Produk, Tujuan, Jumlah, Tanggal Kirim, dst) — tiap baris otomatis jadi satu catatan pengiriman terpisah. Selalu periksa hasilnya sebelum dipakai.</div>
               <div class="dist-field">
                 <label for="distTanggalPesan">Tanggal Pesan</label>
                 <input type="date" id="distTanggalPesan">
@@ -490,7 +495,7 @@
           <div class="section-head">
             <div class="eyebrow">Koperasi Yayasan</div>
             <h2>Koperasi Bahan Makanan</h2>
-            <p>Ringkasan pembelian bahan makanan dan distribusi ke SPPG — terpisah dari Web RSI, untuk laporan biaya ke kepala yayasan.</p>
+            <p>Ringkasan pembelian bahan makanan dan distribusi ke SPPG — terpisah dari Air ARSI, untuk laporan biaya ke kepala yayasan.</p>
           </div>
 
           <div class="section-head section-head--sub">
@@ -1018,6 +1023,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=51"></script>
+<script type="module" src="js/main.js?v=52"></script>
 </body>
 </html>

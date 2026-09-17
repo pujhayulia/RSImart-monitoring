@@ -633,8 +633,16 @@ footer{margin-top:56px;text-align:center;font-size:11.5px;color:var(--muted);}
   .print-report .sj-penutup{font-size:12px;margin-top:14px;line-height:1.7;}
   .print-report .sj-ttd-kota{font-size:12px;margin-top:18px;}
 
-  /* Varian biru untuk dokumen non-final (Konfirmasi Harga / Persetujuan Harga) — merah tetap khusus Invoice resmi */
+  /* Varian biru untuk dokumen non-final (Konfirmasi Harga / Persetujuan Harga) — merah tetap khusus Invoice resmi Koperasi */
   .print-report .doc-accent-blue .invoice-head{border-bottom-color:#1668B0;}
   .print-report .doc-accent-blue .invoice-head-company b{color:#1668B0;}
   .print-report .doc-accent-blue .invoice-title{color:#1668B0;font-size:26px;}
   .print-report .doc-accent-blue .invoice-to-row .to b{color:#1668B0;}
+
+  /* Varian biru untuk Invoice Air ARSI (final, judul tetap ukuran besar) — beda warna dari Invoice
+     Koperasi (merah) supaya kedua jenis dokumen tidak tertukar sekilas. */
+  .print-report .doc-accent-arsi .invoice-head{border-bottom-color:#1668B0;}
+  .print-report .doc-accent-arsi .invoice-head-company b{color:#1668B0;}
+  .print-report .doc-accent-arsi .invoice-title{color:#1668B0;}
+  .print-report .doc-accent-arsi .invoice-to-row .to b{color:#1668B0;}
+  .print-report .doc-accent-arsi .invoice-bottom-rule{border-top-color:#1668B0;}

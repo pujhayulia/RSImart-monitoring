@@ -15,6 +15,7 @@ import {
 } from './ui-gudang.js';
 import { ensureSeedLokasi, watchLokasi } from './ui-lokasi.js';
 import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog } from './ui-distribusi.js';
+import { initImportDistribusiEvents } from './ui-import-distribusi.js';
 import { renderKeuangan, initKeuanganReportEvents } from './ui-keuangan.js';
 import { renderBeranda } from './ui-beranda.js';
 import { watchPembelian, initPembelianEvents, refreshPoOptions } from './ui-pembelian.js';
@@ -75,6 +76,7 @@ function initEvents() {
     watchSelectedGudang(state.currentDate);
   });
   document.getElementById('btnSaveDist').addEventListener('click', saveDistribusi);
+  initImportDistribusiEvents();
   initGudangReportEvents();
   initKeuanganReportEvents();
   initPoSppgEvents();
