@@ -8,13 +8,13 @@ import { state, setStatus } from './state.js';
 import { todayIso, formatRupiah, monthRange } from './utils.js';
 import { initRouter } from './router.js';
 import { initAuthUI, watchAuthState } from './auth.js';
-import { renderProdukGrid, initKatalogEvents } from './ui-katalog.js';
+import { renderProdukGrid, initKatalogEvents, ensureSeedProdukHarga, watchProdukHarga } from './ui-katalog.js';
 import {
   ensureSeedGudang, watchGudangDates, watchSelectedGudang, saveGudang, renderStokProdukFormInputs,
   initGudangReportEvents
 } from './ui-gudang.js';
 import { ensureSeedLokasi, watchLokasi } from './ui-lokasi.js';
-import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog } from './ui-distribusi.js';
+import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog, updateEstimasi } from './ui-distribusi.js';
 import { initImportDistribusiEvents } from './ui-import-distribusi.js';
 import { renderKeuangan, initKeuanganReportEvents } from './ui-keuangan.js';
 import { renderBeranda } from './ui-beranda.js';
@@ -107,14 +107,21 @@ function onKoperasiDataChange() {
   refreshPoOptions();
 }
 
+function onProdukHargaChange() {
+  renderProdukGrid();
+  updateEstimasi();
+}
+
 async function startAppData() {
   if (state.appDataStarted) return;
   state.appDataStarted = true;
   try {
     await ensureSeedGudang();
     await ensureSeedLokasi();
+    await ensureSeedProdukHarga();
     watchGudangDates(onGudangChange);
     watchLokasi();
+    watchProdukHarga(onProdukHargaChange);
     watchDistribusi(onDistribusiChange);
     watchPoSppg(onKoperasiDataChange);
     watchBiayaOperasional(onKoperasiDataChange);

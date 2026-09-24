@@ -2,8 +2,8 @@
 
 export const PRODUK = [
   { id: 'galon19', name: 'Air ARSI', size: 'Galon 19 Liter', icon: 'galon', satuan: 'galon', priceType: 'single', price: 21000 },
-  { id: 'botol660', name: 'Air ARSI', size: 'Botol 660 ml', icon: 'botol', satuan: 'botol', priceType: 'single', price: 39000 },
-  { id: 'botol330', name: 'Air ARSI', size: 'Botol 330 ml', icon: 'botol', satuan: 'botol', priceType: 'single', price: 35000 },
+  { id: 'botol660', name: 'Air ARSI', size: 'Botol 660 ml', icon: 'botol', satuan: 'kardus (isi 24)', priceType: 'single', price: 39000 },
+  { id: 'botol330', name: 'Air ARSI', size: 'Botol 330 ml', icon: 'botol', satuan: 'kardus (isi 24)', priceType: 'single', price: 35000 },
   { id: 'sabunPiring', name: 'Sabun Cuci Piring & Ompreng', size: '5 Liter', icon: 'jerigen', satuan: 'jerigen', priceType: 'tier', tiers: [{ label: 'Grosir', price: 55000 }, { label: 'Agen', price: 60000 }] },
   { id: 'pembersihLantai', name: 'Pembersih Lantai', size: '5 Liter', icon: 'jerigen', satuan: 'jerigen', priceType: 'tier', tiers: [{ label: 'Grosir', price: 53000 }, { label: 'Agen', price: 62400 }] },
   { id: 'sabunTangan', name: 'Sabun Cuci Tangan', size: '5 Liter', icon: 'jerigen', satuan: 'jerigen', priceType: 'tier', tiers: [{ label: 'Grosir', price: 83000 }, { label: 'Agen', price: 91500 }] },
