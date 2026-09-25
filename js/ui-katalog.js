@@ -14,14 +14,21 @@ import { logActivity } from './activity-log.js';
 
 let editingProdukId = null;
 
+/** Isi awal koleksi produkHarga dari PRODUK bila masih kosong. Tidak pernah melempar/menggantung: kalau Firestore
+ * menolak (mis. aturan keamanan belum memuat produkHarga), cukup log peringatan dan app tetap memakai harga bawaan. */
 export async function ensureSeedProdukHarga() {
   const snap = await new Promise((resolve) => {
-    const unsub = onSnapshot(collection(state.db, 'produkHarga'), (qs) => { unsub(); resolve(qs); });
+    const unsub = onSnapshot(
+      collection(state.db, 'produkHarga'),
+      (qs) => { unsub(); resolve(qs); },
+      (err) => { console.warn('Harga produk tidak dapat dimuat dari Firestore — pakai harga bawaan. Pastikan aturan Firestore memuat koleksi "produkHarga" (lihat README).', err); resolve(null); }
+    );
   });
-  if (snap.empty) {
+  if (snap && snap.empty) {
     for (const p of PRODUK) {
       const payload = p.priceType === 'single' ? { priceType: 'single', price: p.price } : { priceType: 'tier', tiers: p.tiers };
-      await setDoc(doc(state.db, 'produkHarga', p.id), payload);
+      try { await setDoc(doc(state.db, 'produkHarga', p.id), payload); }
+      catch (e) { console.warn('Gagal mengisi awal harga produk', p.id, e); return; }
     }
   }
 }

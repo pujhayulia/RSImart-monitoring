@@ -126,6 +126,10 @@ sembarang orang dari luar situs Anda.
          allow read: if true;
          allow write: if request.auth != null;
        }
+       match /produkHarga/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
      }
    }
    ```

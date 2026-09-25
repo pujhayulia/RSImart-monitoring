@@ -118,7 +118,6 @@ async function startAppData() {
   try {
     await ensureSeedGudang();
     await ensureSeedLokasi();
-    await ensureSeedProdukHarga();
     watchGudangDates(onGudangChange);
     watchLokasi();
     watchProdukHarga(onProdukHargaChange);
@@ -128,6 +127,8 @@ async function startAppData() {
     watchPembelian(onKoperasiDataChange);
     watchDistribusiSppg(onKoperasiDataChange);
     watchActivityLog();
+    // Tidak di-await: harga produk bukan syarat app jalan, jadi kegagalan/lambatnya tidak boleh menahan yang lain.
+    ensureSeedProdukHarga().catch(e => console.warn('Seed harga produk gagal', e));
   } catch (e) {
     console.error('Gagal inisialisasi data', e);
   }
