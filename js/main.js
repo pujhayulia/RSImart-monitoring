@@ -14,7 +14,7 @@ import {
   initGudangReportEvents
 } from './ui-gudang.js';
 import { ensureSeedLokasi, watchLokasi } from './ui-lokasi.js';
-import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog, updateEstimasi } from './ui-distribusi.js';
+import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog, updateHargaUI } from './ui-distribusi.js';
 import { initImportDistribusiEvents } from './ui-import-distribusi.js';
 import { renderKeuangan, initKeuanganReportEvents } from './ui-keuangan.js';
 import { renderBeranda } from './ui-beranda.js';
@@ -109,7 +109,7 @@ function onKoperasiDataChange() {
 
 function onProdukHargaChange() {
   renderProdukGrid();
-  updateEstimasi();
+  updateHargaUI();
 }
 
 async function startAppData() {

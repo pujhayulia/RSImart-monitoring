@@ -6,6 +6,7 @@ import { formatRupiah } from './utils.js';
 import { renderDistItemHtml, wireDistItemActions, setDistEditHandler } from './ui-dist-item.js';
 import { ensureLokasiTersimpan } from './ui-lokasi.js';
 import { logActivity } from './activity-log.js';
+import { simpanPayloadHarga } from './ui-katalog.js';
 
 let editingId = null;
 
@@ -18,15 +19,58 @@ export function initProdukSelects() {
   filterSel.innerHTML = `<option value="all">Semua Produk</option>` + opts;
   filterSel.addEventListener('change', renderDistLog);
 
-  distProduk.addEventListener('change', updateHargaUI);
-  document.getElementById('distTipeHarga').addEventListener('change', updateEstimasi);
+  distProduk.addEventListener('change', () => { tutupEditHarga(); updateHargaUI(); });
+  document.getElementById('distTipeHarga').addEventListener('change', () => { tutupEditHarga(); updateEstimasi(); });
   document.getElementById('distJumlah').addEventListener('input', updateEstimasi);
   document.getElementById('distDibayar').addEventListener('change', toggleMetodeWrap);
   document.getElementById('btnCancelEditDist').addEventListener('click', cancelEditDistribusi);
+  document.getElementById('btnEditHargaDist').addEventListener('click', bukaEditHarga);
+  document.getElementById('btnBatalHargaDist').addEventListener('click', tutupEditHarga);
+  document.getElementById('btnSimpanHargaDist').addEventListener('click', simpanHargaDariDistribusi);
   setDistEditHandler(startEditDistribusi);
 
   updateHargaUI();
   toggleMetodeWrap();
+}
+
+// ---- Ubah harga katalog langsung dari form Distribusi (harga produk/tier yang sedang dipilih) ----
+function tutupEditHarga() {
+  document.getElementById('distHargaEditWrap').classList.add('hidden');
+}
+
+function bukaEditHarga() {
+  const produk = produkById(document.getElementById('distProduk').value);
+  if (!produk) return;
+  const tipe = document.getElementById('distTipeHarga').value;
+  const label = produk.priceType === 'tier' ? `Harga baru — ${tipe} (per ${produk.satuan})` : `Harga baru (per ${produk.satuan})`;
+  document.getElementById('distHargaEditLabel').textContent = label;
+  document.getElementById('distHargaInput').value = priceFor(produk, tipe);
+  document.getElementById('distHargaEditWrap').classList.remove('hidden');
+  document.getElementById('distHargaInput').focus();
+}
+
+async function simpanHargaDariDistribusi() {
+  const produk = produkById(document.getElementById('distProduk').value);
+  if (!produk) return;
+  const input = document.getElementById('distHargaInput');
+  const val = Number(input.value);
+  if (!input.value || isNaN(val) || val < 0) { alert('Harga tidak valid.'); return; }
+  const tipe = document.getElementById('distTipeHarga').value;
+  const payload = produk.priceType === 'single'
+    ? { priceType: 'single', price: val }
+    : { priceType: 'tier', tiers: produk.tiers.map(t => ({ label: t.label, price: t.label === tipe ? val : t.price })) };
+
+  const btn = document.getElementById('btnSimpanHargaDist');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try {
+    await simpanPayloadHarga(produk, payload, 'Distribusi');
+    tutupEditHarga();
+  } catch (e) {
+    console.error(e);
+    alert('Gagal menyimpan harga. Pastikan Anda sudah login dan aturan Firestore sudah benar.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Simpan ke Katalog';
+  }
 }
 
 export function toggleMetodeWrap() {
@@ -41,7 +85,9 @@ export function updateHargaUI() {
   const tipeSelect = document.getElementById('distTipeHarga');
   if (produk && produk.priceType === 'tier') {
     tipeWrap.classList.remove('hidden');
+    const dipilih = tipeSelect.value; // pertahankan pilihan tipe saat daftar harga di-refresh
     tipeSelect.innerHTML = produk.tiers.map(t => `<option value="${t.label}">${t.label} — ${formatRupiah(t.price)}</option>`).join('');
+    if (produk.tiers.some(t => t.label === dipilih)) tipeSelect.value = dipilih;
   } else {
     tipeWrap.classList.add('hidden');
   }

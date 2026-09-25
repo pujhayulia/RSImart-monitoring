@@ -417,7 +417,16 @@
                 <textarea id="distKeterangan" rows="2" placeholder="Mis. nama pengantar, catatan tambahan"></textarea>
               </div>
               <div class="estimasi-box">
-                <div class="estimasi-row"><span>Harga satuan</span><b id="distHargaSatuan">–</b></div>
+                <div class="estimasi-row"><span>Harga satuan</span><span class="harga-satuan-cell"><b id="distHargaSatuan">–</b> <button type="button" class="btn-ghost price-edit-btn" id="btnEditHargaDist">✏️ Ubah</button></span></div>
+                <div class="harga-edit-inline hidden" id="distHargaEditWrap">
+                  <label for="distHargaInput" id="distHargaEditLabel">Harga baru</label>
+                  <input type="number" id="distHargaInput" min="0">
+                  <div class="price-edit-actions">
+                    <button type="button" class="btn-ghost" id="btnBatalHargaDist">Batal</button>
+                    <button type="button" class="btn" id="btnSimpanHargaDist">Simpan ke Katalog</button>
+                  </div>
+                  <div class="shared-note">Mengubah harga katalog: berlaku untuk pengiriman berikutnya. Pengiriman yang sudah tercatat tidak berubah.</div>
+                </div>
                 <div class="estimasi-row total"><span>Estimasi total</span><b id="distEstimasi">—</b></div>
               </div>
               <button type="button" class="btn btn--block" id="btnSaveDist">Simpan Pengiriman</button>
@@ -1023,6 +1032,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=54"></script>
+<script type="module" src="js/main.js?v=55"></script>
 </body>
 </html>

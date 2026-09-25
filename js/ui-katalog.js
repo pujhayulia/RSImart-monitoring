@@ -48,6 +48,13 @@ export function watchProdukHarga(onChange) {
   }, (err) => console.error('Gagal memuat harga produk', err));
 }
 
+/** Tulis harga produk ke Firestore (koleksi produkHarga). Dipakai Katalog dan Distribusi supaya satu jalur simpan.
+ * PRODUK ikut ter-update otomatis lewat watchProdukHarga. Melempar error bila gagal — pemanggil yang menampilkan pesan. */
+export async function simpanPayloadHarga(produk, payload, modul) {
+  await setDoc(doc(state.db, 'produkHarga', produk.id), { ...payload, updatedAt: Date.now(), updatedBy: state.currentUserEmail });
+  logActivity({ action: 'ubah', modul, ringkasan: `Ubah harga ${produk.name} (${produk.size})` });
+}
+
 async function simpanHargaProduk(id) {
   const produk = produkById(id);
   if (!produk) return;
@@ -70,8 +77,7 @@ async function simpanHargaProduk(id) {
   }
 
   try {
-    await setDoc(doc(state.db, 'produkHarga', id), { ...payload, updatedAt: Date.now(), updatedBy: state.currentUserEmail });
-    logActivity({ action: 'ubah', modul: 'Katalog', ringkasan: `Ubah harga ${produk.name} (${produk.size})` });
+    await simpanPayloadHarga(produk, payload, 'Katalog');
     editingProdukId = null;
     renderProdukGrid();
   } catch (e) {
