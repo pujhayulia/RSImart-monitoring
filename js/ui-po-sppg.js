@@ -829,6 +829,17 @@ export function renderPoSppg() {
     }
   }
 
+  const backfillBar = document.getElementById('poBackfillBar');
+  if (backfillBar) {
+    const pendingCount = poItemBelumPunyaPembelian().length;
+    backfillBar.classList.toggle('hidden', pendingCount === 0);
+    const btnEl = document.getElementById('btnBackfillPembelianPo');
+    if (!btnEl.disabled) {
+      document.getElementById('poBackfillText').textContent =
+        `⚠️ Ada ${pendingCount} barang dari PO lama yang belum punya catatan di Pembelian Bahan Makanan.`;
+    }
+  }
+
   if (list.length === 0) {
     logEl.innerHTML = `<div class="empty-state">Belum ada PO dari SPPG untuk filter ini.</div>`;
     return;
@@ -1037,6 +1048,53 @@ async function importArsipLama() {
 /** Semua catatan Pembelian yang ditautkan ke barang PO tertentu (poId + itemId). */
 function pembelianUntukPoItem(poId, itemId) {
   return (state.lastPembelianItems || []).filter(p => p.poId === poId && p.poItemId === itemId);
+}
+
+/** Barang PO yang belum punya catatan Pembelian SAMA SEKALI (bukan cuma belum dilengkapi) — dipakai untuk
+ * menambahkan draft ke PO lama (dibuat sebelum fitur draft-otomatis ini ada). Barang yang sudah punya
+ * minimal satu catatan (draft ataupun yang sudah lengkap) dilewati, supaya tidak dobel. */
+function poItemBelumPunyaPembelian() {
+  const hasil = [];
+  state.lastPoSppgItems.forEach(po => {
+    (po.items || []).forEach((it, idx) => {
+      const key = poItemKey(it, idx);
+      if (pembelianUntukPoItem(po.id, key).length === 0) hasil.push({ po, item: it, itemId: key });
+    });
+  });
+  return hasil;
+}
+
+async function backfillDraftPembelianPoLama() {
+  const pending = poItemBelumPunyaPembelian();
+  if (pending.length === 0) return;
+  if (!confirm(`Tambahkan ${pending.length} barang dari PO lama ke Pembelian Bahan Makanan (sebagai "Perlu Dilengkapi")? Barang yang sudah punya catatan pembelian tidak akan diduplikasi.`)) return;
+
+  const btn = document.getElementById('btnBackfillPembelianPo');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menambahkan...'; }
+  let batch = writeBatch(state.db);
+  let opsInBatch = 0;
+  try {
+    for (const { po, item, itemId } of pending) {
+      const ref = doc(collection(state.db, 'pembelianBahanMakanan'));
+      batch.set(ref, {
+        namaToko: '', noHpToko: '', alamatToko: '', namaPembeli: '',
+        namaBarang: item.namaBarang, jumlah: item.jumlah, satuan: item.satuan, harga: null,
+        catatan: '', poId: po.id, poItemId: itemId,
+        createdAt: serverTimestamp(), createdBy: state.currentUserEmail,
+      });
+      opsInBatch += 1;
+      if (opsInBatch >= 450) { await batch.commit(); batch = writeBatch(state.db); opsInBatch = 0; }
+    }
+    if (opsInBatch > 0) await batch.commit();
+    logActivity({ action: 'tambah', modul: 'Koperasi - Pembelian', ringkasan: `Tambahkan ${pending.length} draft pembelian dari PO lama` });
+    alert(`${pending.length} barang dari PO lama berhasil ditambahkan ke Pembelian — cari tanda "⚠️ Perlu Dilengkapi".`);
+    renderPoSppg(); // segarkan banner (jumlahnya sekarang harus 0)
+  } catch (e) {
+    console.error('Gagal menambahkan draft pembelian dari PO lama', e);
+    alert('Gagal menambahkan. Pastikan Anda sudah login dan aturan Firestore sudah benar.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Tambahkan ke Pembelian Sekarang'; }
+  }
 }
 
 /** Realisasi pembelian (Rp total & qty) untuk satu barang PO — `harga` di Pembelian sudah berupa total per baris,
@@ -1692,5 +1750,6 @@ export function initPoSppgEvents() {
   });
   document.getElementById('btnDownloadPo').addEventListener('click', downloadLaporanPo);
   document.getElementById('btnImportArsipPo').addEventListener('click', importArsipLama);
+  document.getElementById('btnBackfillPembelianPo').addEventListener('click', backfillDraftPembelianPoLama);
   resetItemRows();
 }
