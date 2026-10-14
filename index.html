@@ -701,7 +701,7 @@
           <div class="section-head">
             <div class="eyebrow">Koperasi Yayasan</div>
             <h2>Pembelian Bahan Makanan</h2>
-            <p>Isi info toko sekali, lalu tambahkan sebanyak apa pun barang yang dibeli dari toko itu — tiap barang tetap tercatat sebagai catatan tersendiri di daftar riwayat. Tanggal &amp; jam tersimpan otomatis.</p>
+            <p>Barang dari PO dari SPPG otomatis masuk ke sini (ditandai "⚠️ Perlu Dilengkapi") begitu PO dibuat — tim lapangan tinggal klik <b>Lengkapi</b> dan isi toko &amp; harganya. Untuk pembelian lain (tidak dari PO), isi info toko sekali lalu tambahkan sebanyak apa pun barangnya. Tanggal &amp; jam tersimpan otomatis.</p>
           </div>
 
           <div class="totals-row koperasi-totals">
@@ -712,6 +712,10 @@
             <div class="total-card alt">
               <div class="lbl">Jumlah Transaksi (Difilter)</div>
               <div class="val" id="pembelianTotalTransaksi">–</div>
+            </div>
+            <div class="total-card danger total-card-clickable" title="Klik untuk tampilkan yang perlu dilengkapi saja">
+              <div class="lbl">⚠️ Perlu Dilengkapi</div>
+              <div class="val" id="pembelianBelumLengkap">–</div>
             </div>
           </div>
 
@@ -724,7 +728,7 @@
                 <select id="pembelianPoId">
                   <option value="">— Tidak dikaitkan ke PO —</option>
                 </select>
-                <div class="shared-note">Pilih PO: daftar barangnya otomatis terisi di bawah (nama, sisa jumlah yang belum dibeli, satuan) — tinggal isi harga beli dari toko. Hapus baris yang tidak dibeli di toko ini.</div>
+                <div class="shared-note">Barang PO biasanya sudah otomatis muncul di daftar riwayat (kolom kanan, tandai "⚠️ Perlu Dilengkapi") — kolom ini untuk kasus lain, mis. menambah barang PO yang belum ada draft-nya. Pilih PO: daftar barangnya otomatis terisi di bawah (nama, sisa jumlah yang belum dibeli, satuan) — tinggal isi harga beli dari toko.</div>
               </div>
               <div class="dist-field">
                 <label for="pembelianNamaToko">Nama Toko</label>
@@ -762,6 +766,7 @@
                 <span class="date-filter-sep">–</span>
                 <input type="date" id="pembelianFilterSampai" aria-label="Sampai tanggal">
                 <input type="text" id="pembelianFilterDapur" placeholder="Cari nama dapur/SPPG (dari PO terkait)..." aria-label="Cari dapur">
+                <label class="filter-checkbox"><input type="checkbox" id="pembelianFilterBelumLengkap"> Hanya yang perlu dilengkapi</label>
                 <button type="button" class="filter-reset" id="btnPembelianFilterReset">Reset</button>
                 <button type="button" class="btn-ghost download-btn" id="btnDownloadPembelian">⬇ Download (CSV)</button>
               </div>
@@ -1037,6 +1042,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=57"></script>
+<script type="module" src="js/main.js?v=58"></script>
 </body>
 </html>

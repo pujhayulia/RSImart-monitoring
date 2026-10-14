@@ -278,6 +278,15 @@ select, input, button, textarea{
 .total-card.danger{background:#C0503B;}
 .total-card .lbl{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;}
 .total-card .val{font-size:22px;font-weight:800;margin-top:4px;}
+.total-card-clickable{cursor:pointer;transition:transform .1s;}
+.total-card-clickable:hover{transform:translateY(-1px);}
+
+.filter-checkbox{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600;cursor:pointer;white-space:nowrap;}
+.filter-checkbox input{width:auto;}
+
+.dist-item-draft{background:#FDF4F1;}
+.belum-lengkap-badge{color:#B5432E;font-weight:700;}
+.lengkapi-btn{font-size:11.5px;padding:6px 10px;}
 
 /* BERANDA */
 .quick-link-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}

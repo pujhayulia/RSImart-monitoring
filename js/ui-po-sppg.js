@@ -1039,10 +1039,13 @@ function pembelianUntukPoItem(poId, itemId) {
   return (state.lastPembelianItems || []).filter(p => p.poId === poId && p.poItemId === itemId);
 }
 
-/** Realisasi pembelian (Rp total & qty) untuk satu barang PO — `harga` di Pembelian sudah berupa total per baris, bukan per satuan. */
+/** Realisasi pembelian (Rp total & qty) untuk satu barang PO — `harga` di Pembelian sudah berupa total per baris,
+ * bukan per satuan. Draft otomatis dari PO yang belum dilengkapi tim lapangan (harga masih kosong) SENGAJA
+ * tidak dihitung di sini — itu baru rencana/reservasi, belum benar-benar dibeli, jadi belum boleh ikut
+ * menaikkan progress "sudah dibeli" ataupun margin/profit. */
 function itemRealisasi(poId, itemId) {
-  const purchases = pembelianUntukPoItem(poId, itemId);
-  const totalRp = purchases.reduce((sum, p) => sum + (typeof p.harga === 'number' ? p.harga : 0), 0);
+  const purchases = pembelianUntukPoItem(poId, itemId).filter(p => typeof p.harga === 'number');
+  const totalRp = purchases.reduce((sum, p) => sum + p.harga, 0);
   const totalQty = purchases.reduce((sum, p) => sum + (typeof p.jumlah === 'number' ? p.jumlah : 0), 0);
   return { purchases, totalRp, totalQty };
 }
@@ -1565,6 +1568,31 @@ function cancelEditPo() {
   document.getElementById('btnCancelEditPo').classList.add('hidden');
 }
 
+/** Begitu PO baru tersimpan, langsung buat satu catatan Pembelian "draft" per barang — supaya PO
+ * tidak perlu diketik ulang di halaman Pembelian. Toko/No HP/Alamat/Nama Pembeli/Harga sengaja
+ * dikosongkan (info itu belum ada saat PO dibuat): tim lapangan yang nanti belanja tinggal buka
+ * catatan ini di halaman Pembelian (ditandai "⚠️ Perlu Dilengkapi") dan isi detail tokonya. Hanya
+ * dipanggil saat PO BARU dibuat, bukan saat PO diedit, supaya tidak dobel membuat draft.
+ */
+async function buatDraftPembelianDariPo(poId, items) {
+  const batch = writeBatch(state.db);
+  items.forEach(it => {
+    const ref = doc(collection(state.db, 'pembelianBahanMakanan'));
+    batch.set(ref, {
+      namaToko: '', noHpToko: '', alamatToko: '', namaPembeli: '',
+      namaBarang: it.namaBarang, jumlah: it.jumlah, satuan: it.satuan, harga: null,
+      catatan: '', poId, poItemId: it.itemId,
+      createdAt: serverTimestamp(), createdBy: state.currentUserEmail,
+    });
+  });
+  try {
+    await batch.commit();
+  } catch (e) {
+    // Jangan sampai gagalnya ini bikin PO terlihat gagal tersimpan — PO-nya sendiri sudah berhasil.
+    console.error('Gagal membuat draft pembelian dari PO', e);
+  }
+}
+
 export async function savePo() {
   const tanggalPo = document.getElementById('poTanggal').value;
   const tujuanSppg = document.getElementById('poTujuan').value.trim();
@@ -1601,8 +1629,9 @@ export async function savePo() {
       logActivity({ action: 'ubah', modul: 'Koperasi - PO SPPG', ringkasan: `Update PO dari ${tujuanSppg} (${items.length} jenis barang)` });
       cancelEditPo();
     } else {
-      await addDoc(collection(state.db, 'poSppg'), entry);
+      const poRef = await addDoc(collection(state.db, 'poSppg'), entry);
       logActivity({ action: 'tambah', modul: 'Koperasi - PO SPPG', ringkasan: `PO baru dari ${tujuanSppg} (${items.length} jenis barang)` });
+      await buatDraftPembelianDariPo(poRef.id, items);
       document.getElementById('poTujuan').value = '';
       document.getElementById('poCatatan').value = '';
       resetItemRows();

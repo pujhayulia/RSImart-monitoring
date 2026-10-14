@@ -206,20 +206,29 @@ function dapurUntukPembelian(it) {
   return po ? po.tujuanSppg : '';
 }
 
+/** Draft otomatis dari PO yang belum dilengkapi tim lapangan — belum ada nama toko sama sekali. */
+function belumLengkap(it) {
+  return !it.namaToko;
+}
+
 function filteredPembelian() {
   const dari = document.getElementById('pembelianFilterDari').value;
   const sampai = document.getElementById('pembelianFilterSampai').value;
   const dapur = document.getElementById('pembelianFilterDapur').value.trim().toLowerCase();
+  const hanyaBelumLengkap = document.getElementById('pembelianFilterBelumLengkap').checked;
   return state.lastPembelianItems.filter(it => {
+    if (hanyaBelumLengkap) return belumLengkap(it); // abaikan filter tanggal — jangan sampai ada draft lama yang tersembunyi
     if ((dari || sampai) && !isDateStrInRange(pembelianTanggalIso(it), dari, sampai)) return false;
     if (dapur && !dapurUntukPembelian(it).toLowerCase().includes(dapur)) return false;
     return true;
   });
 }
 
-/** Total belanja & jumlah transaksi dalam rentang tanggal (kosongkan dari/sampai untuk semua data) — dipakai di Beranda Koperasi. */
+/** Total belanja & jumlah transaksi dalam rentang tanggal (kosongkan dari/sampai untuk semua data) — dipakai di Beranda Koperasi.
+ * Draft otomatis dari PO yang belum dilengkapi tim lapangan TIDAK dihitung — belum benar-benar jadi transaksi pembelian. */
 export function computePembelianSummary(dari, sampai) {
-  const items = (!dari && !sampai) ? state.lastPembelianItems : state.lastPembelianItems.filter(it => isDateStrInRange(pembelianTanggalIso(it), dari, sampai));
+  const all = (!dari && !sampai) ? state.lastPembelianItems : state.lastPembelianItems.filter(it => isDateStrInRange(pembelianTanggalIso(it), dari, sampai));
+  const items = all.filter(it => !belumLengkap(it));
   let totalBelanja = 0;
   items.forEach(it => { totalBelanja += typeof it.harga === 'number' ? it.harga : 0; });
   return { totalBelanja, jumlahTransaksi: items.length };
@@ -247,12 +256,19 @@ export function renderPembelian() {
   const logEl = document.getElementById('pembelianLog');
   const items = filteredPembelian();
 
+  // "Transaksi" = pembelian yang sudah benar-benar terjadi (toko & harga terisi) — draft yang masih
+  // menunggu dilengkapi tim lapangan belum dihitung, supaya totalnya tidak menyesatkan.
+  const itemsSelesai = items.filter(it => !belumLengkap(it));
   let totalBelanja = 0;
-  items.forEach(it => { totalBelanja += typeof it.harga === 'number' ? it.harga : 0; });
+  itemsSelesai.forEach(it => { totalBelanja += typeof it.harga === 'number' ? it.harga : 0; });
   const totalBelanjaEl = document.getElementById('pembelianTotalBelanja');
   const totalTransaksiEl = document.getElementById('pembelianTotalTransaksi');
   if (totalBelanjaEl) totalBelanjaEl.textContent = formatRupiah(totalBelanja);
-  if (totalTransaksiEl) totalTransaksiEl.textContent = String(items.length);
+  if (totalTransaksiEl) totalTransaksiEl.textContent = String(itemsSelesai.length);
+
+  // Dihitung dari SEMUA data (bukan yang difilter) — supaya draft lama tidak ketinggalan dari pandangan.
+  const belumLengkapEl = document.getElementById('pembelianBelumLengkap');
+  if (belumLengkapEl) belumLengkapEl.textContent = String(state.lastPembelianItems.filter(belumLengkap).length);
 
   if (items.length === 0) {
     logEl.innerHTML = `<div class="empty-state">Belum ada catatan pembelian untuk filter ini.</div>`;
@@ -261,13 +277,17 @@ export function renderPembelian() {
 
   logEl.innerHTML = items.map(it => {
     const linkedPo = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
+    const draft = belumLengkap(it);
+    const infoToko = draft
+      ? `<div class="meta belum-lengkap-badge">⚠️ Perlu Dilengkapi — belum ada toko &amp; harga</div>`
+      : `<div class="meta">${escapeHtml(it.namaToko)}${it.noHpToko ? ' · ' + escapeHtml(it.noHpToko) : ''}</div>
+         <div class="meta">${escapeHtml(it.alamatToko || '-')}</div>
+         <div class="meta">Dibeli oleh ${escapeHtml(it.namaPembeli)} · ${pembelianTanggalDisplay(it)}</div>`;
     return `
-    <div class="dist-item">
+    <div class="dist-item${draft ? ' dist-item-draft' : ''}">
       <div class="left">
         <b>${escapeHtml(it.namaBarang)}</b>
-        <div class="meta">${escapeHtml(it.namaToko)}${it.noHpToko ? ' · ' + escapeHtml(it.noHpToko) : ''}</div>
-        <div class="meta">${escapeHtml(it.alamatToko || '-')}</div>
-        <div class="meta">Dibeli oleh ${escapeHtml(it.namaPembeli)} · ${pembelianTanggalDisplay(it)}</div>
+        ${infoToko}
         ${it.catatan ? `<div class="meta">Catatan: ${escapeHtml(it.catatan)}</div>` : ''}
         ${it.createdBy ? `<div class="meta">Diinput oleh ${escapeHtml(it.createdBy)}</div>` : ''}
         ${linkedPo ? `<div class="meta">🔗 Untuk PO: ${escapeHtml(linkedPo.tujuanSppg)} (${formatDate(linkedPo.tanggalPo)})</div>` : ''}
@@ -276,6 +296,7 @@ export function renderPembelian() {
         <div class="qty">${it.jumlah} ${escapeHtml(it.satuan)}</div>
         <div class="dist-item-total">${formatRupiah(it.harga)}</div>
         <div class="dist-item-actions">
+          ${draft ? `<button class="btn lengkapi-btn" data-editid="${it.id}" title="Isi toko &amp; harga beli">Lengkapi</button>` : ''}
           <button class="edit-btn" data-editid="${it.id}" title="Edit catatan ini">✏️</button>
           <button class="del-btn" data-delid="${it.id}" title="Hapus catatan ini">🗑</button>
         </div>
@@ -287,7 +308,7 @@ export function renderPembelian() {
   logEl.querySelectorAll('button.del-btn').forEach(btn => {
     btn.addEventListener('click', () => deletePembelian(btn.dataset.delid));
   });
-  logEl.querySelectorAll('button.edit-btn').forEach(btn => {
+  logEl.querySelectorAll('button.edit-btn, button.lengkapi-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const item = state.lastPembelianItems.find(it => it.id === btn.dataset.editid);
       if (item) startEditPembelian(item);
@@ -434,10 +455,11 @@ export function downloadLaporanPembelian() {
     return;
   }
 
-  const headers = ['Tanggal', 'Nama Toko', 'No. HP Toko', 'Alamat Toko', 'Nama Pembeli', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga (Rp)', 'Untuk PO', 'Catatan', 'Diinput Oleh'];
+  const headers = ['Status', 'Tanggal', 'Nama Toko', 'No. HP Toko', 'Alamat Toko', 'Nama Pembeli', 'Nama Barang', 'Jumlah', 'Satuan', 'Harga (Rp)', 'Untuk PO', 'Catatan', 'Diinput Oleh'];
   const rows = items.map(it => {
     const linkedPo = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
     return [
+      belumLengkap(it) ? 'PERLU DILENGKAPI' : 'Selesai',
       pembelianTanggalDisplay(it), it.namaToko, it.noHpToko || '', it.alamatToko || '',
       it.namaPembeli, it.namaBarang, it.jumlah, it.satuan, it.harga,
       linkedPo ? `${linkedPo.tujuanSppg} (${formatDate(linkedPo.tanggalPo)})` : '',
@@ -448,7 +470,7 @@ export function downloadLaporanPembelian() {
   let total = 0;
   items.forEach(it => { total += typeof it.harga === 'number' ? it.harga : 0; });
   rows.push([]);
-  rows.push(['TOTAL PENGELUARAN', '', '', '', '', '', '', '', total]);
+  rows.push(['', 'TOTAL PENGELUARAN', '', '', '', '', '', '', '', total]);
 
   downloadCsv(`Laporan-Pembelian-${dateRangeFileTag(dari, sampai)}.csv`, headers, rows);
 }
@@ -462,10 +484,17 @@ export function initPembelianEvents() {
   document.getElementById('pembelianFilterDari').addEventListener('change', renderPembelian);
   document.getElementById('pembelianFilterSampai').addEventListener('change', renderPembelian);
   document.getElementById('pembelianFilterDapur').addEventListener('input', renderPembelian);
+  document.getElementById('pembelianFilterBelumLengkap').addEventListener('change', renderPembelian);
+  document.getElementById('pembelianBelumLengkap').closest('.total-card').addEventListener('click', () => {
+    const cb = document.getElementById('pembelianFilterBelumLengkap');
+    cb.checked = !cb.checked;
+    renderPembelian();
+  });
   document.getElementById('btnPembelianFilterReset').addEventListener('click', () => {
     document.getElementById('pembelianFilterDari').value = '';
     document.getElementById('pembelianFilterSampai').value = '';
     document.getElementById('pembelianFilterDapur').value = '';
+    document.getElementById('pembelianFilterBelumLengkap').checked = false;
     renderPembelian();
   });
   document.getElementById('btnDownloadPembelian').addEventListener('click', downloadLaporanPembelian);
