@@ -17,6 +17,8 @@ import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 import { printReport, simpanSebagaiGambar } from './print-report.js';
 import { navigateTo } from './router.js';
 import { MARGIN_LAMA_BATCH, MARGIN_LAMA_DATA } from './margin-lama-data.js';
+import { SEPT_OKT_BATCH, SEPT_OKT_DATA } from './sept-okt-data.js';
+import { STOK_BARANG_BACKFILL_BATCH, STOK_BARANG_BACKFILL_DATA } from './stok-barang-backfill-data.js';
 import { cariMasterBarang } from './ui-master-barang.js';
 
 // Batch lama (sebelum ada data pembelian/margin) — dibersihkan otomatis saat arsip baru diimpor.
@@ -854,6 +856,12 @@ export function renderPoSppg() {
     }
   }
 
+  const septOktBar = document.getElementById('poSeptOktBar');
+  if (septOktBar) septOktBar.classList.toggle('hidden', isSeptOktImported());
+
+  const stokBackfillBar = document.getElementById('poStokBackfillBar');
+  if (stokBackfillBar) stokBackfillBar.classList.toggle('hidden', isStokBarangBackfillImported());
+
   if (list.length === 0) {
     logEl.innerHTML = `<div class="empty-state">Belum ada PO dari SPPG untuk filter ini.</div>`;
     return;
@@ -1057,6 +1065,149 @@ async function importArsipLama() {
   alert(poCount > 0
     ? `Selesai. ${poCount} PO, ${notaCount} nota pemasukan, ${pembelianCount} pembelian, dan ${biayaCount} biaya operasional berhasil diimpor.`
     : `Selesai. ${notaCount} nota pemasukan berhasil dilengkapi — sekarang tercatat di Total Pemasukan.`);
+}
+
+function isSeptOktImported() {
+  return state.lastPoSppgItems.some(po => po.importBatch === SEPT_OKT_BATCH);
+}
+
+/** Import arsip LPJ lanjutan (31 Agustus - 16 Oktober 2026), pola identik dengan importArsipLama() tapi
+ * untuk SEPT_OKT_DATA -- lihat komentar di js/sept-okt-data.js untuk penjelasan lengkap cakupan & yang
+ * dikecualikan. Beda dari importArsipLama(): tidak ada arsip lama yang perlu dihapus/digantikan di sini,
+ * jadi lebih sederhana (sekali jalan, tidak ada mode "lengkapi nota" terpisah). */
+async function importArsipSeptOkt() {
+  if (isSeptOktImported()) { alert('Arsip ini sudah pernah diimpor sebelumnya.'); return; }
+  const totalDocs = SEPT_OKT_DATA.reduce((s, rec) => s + 2 + rec.items.length + rec.biayaOperasional.length, 0);
+  if (!confirm(`Import arsip LPJ lanjutan (31 Agustus - 16 Oktober 2026): ${SEPT_OKT_DATA.length} PO lengkap dengan nota pemasukan, data pembelian & biaya operasional (total ${totalDocs} dokumen). Lanjutkan?`)) return;
+
+  const btn = document.getElementById('btnImportArsipSeptOkt');
+  if (btn) { btn.disabled = true; btn.textContent = 'Mengimpor...'; }
+
+  let batch = writeBatch(state.db);
+  let opsInBatch = 0;
+  let poCount = 0, pembelianCount = 0, biayaCount = 0, notaCount = 0;
+  const flush = async () => {
+    if (opsInBatch === 0) return;
+    await batch.commit();
+    batch = writeBatch(state.db);
+    opsInBatch = 0;
+  };
+
+  try {
+    for (const rec of SEPT_OKT_DATA) {
+      if (btn) btn.textContent = `Mengimpor... (${poCount}/${SEPT_OKT_DATA.length} PO)`;
+
+      const poRef = doc(collection(state.db, 'poSppg'));
+      const notaRef = doc(collection(state.db, 'distribusiSppg'));
+      const items = rec.items.map((it, idx) => ({
+        namaBarang: it.namaBarang,
+        jumlah: it.jumlah,
+        satuan: it.satuan,
+        hargaRencana: it.hargaSatuan,
+        hargaFinal: it.hargaSatuan,
+        itemId: `${poRef.id}-i${idx}`,
+      }));
+      batch.set(poRef, {
+        tanggalPo: rec.tanggal,
+        tujuanSppg: rec.tujuanSppg,
+        items,
+        catatan: 'Arsip LPJ Pengadaan Bahan Baku (diimpor dari dashboard keuangan koperasi)',
+        status: 'terkirim',
+        distribusiId: notaRef.id,
+        invoiceNomor: null,
+        importBatch: SEPT_OKT_BATCH,
+        createdAt: serverTimestamp(),
+        createdBy: state.currentUserEmail,
+      });
+      opsInBatch += 1; poCount += 1;
+      if (opsInBatch >= 450) await flush();
+
+      batch.set(notaRef, {
+        tanggalKirim: rec.tanggal,
+        jamKirim: '',
+        tujuanSppg: rec.tujuanSppg,
+        catatan: 'Arsip LPJ Pengadaan Bahan Baku (diimpor dari dashboard keuangan koperasi)',
+        items: rec.items.map(it => ({ namaBarang: it.namaBarang, jumlah: it.jumlah, satuan: it.satuan, hargaJual: it.hargaSatuan })),
+        poId: poRef.id,
+        importBatch: SEPT_OKT_BATCH,
+        createdAt: serverTimestamp(),
+        createdBy: state.currentUserEmail,
+      });
+      opsInBatch += 1; notaCount += 1;
+      if (opsInBatch >= 450) await flush();
+
+      for (let idx = 0; idx < rec.items.length; idx++) {
+        const it = rec.items[idx];
+        const pbRef = doc(collection(state.db, 'pembelianBahanMakanan'));
+        batch.set(pbRef, {
+          namaToko: '(Arsip LPJ)', noHpToko: '', alamatToko: '', namaPembeli: '(Arsip)',
+          namaBarang: it.namaBarang, jumlah: it.jumlah, satuan: it.satuan, harga: it.realisasi ?? 0,
+          catatan: 'Realisasi arsip LPJ', poId: poRef.id, poItemId: items[idx].itemId,
+          createdAt: serverTimestamp(), createdBy: state.currentUserEmail, importBatch: SEPT_OKT_BATCH,
+        });
+        opsInBatch += 1; pembelianCount += 1;
+        if (opsInBatch >= 450) await flush();
+      }
+
+      for (const o of rec.biayaOperasional) {
+        const boRef = doc(collection(state.db, 'biayaOperasional'));
+        batch.set(boRef, {
+          tanggal: rec.tanggal, lokasi: rec.tujuanSppg, kategori: o.kategori, keterangan: o.keterangan, jumlah: o.jumlah,
+          createdAt: serverTimestamp(), createdBy: state.currentUserEmail, importBatch: SEPT_OKT_BATCH,
+        });
+        opsInBatch += 1; biayaCount += 1;
+        if (opsInBatch >= 450) await flush();
+      }
+    }
+    await flush();
+    logActivity({
+      action: 'tambah', modul: 'Koperasi - PO SPPG',
+      ringkasan: `Import arsip LPJ lanjutan: ${poCount} PO, ${notaCount} nota pemasukan, ${pembelianCount} pembelian, ${biayaCount} biaya operasional (31 Agustus-16 Oktober 2026)`,
+    });
+    alert(`Selesai. ${poCount} PO, ${notaCount} nota pemasukan, ${pembelianCount} pembelian, dan ${biayaCount} biaya operasional berhasil diimpor.`);
+  } catch (e) {
+    console.error('Gagal import arsip Sept-Okt', e);
+    alert('Gagal mengimpor. Pastikan Anda sudah login dan aturan Firestore sudah benar.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Import Arsip Sept-Okt Sekarang'; }
+  }
+}
+
+function isStokBarangBackfillImported() {
+  return state.lastBiayaOperasionalItems.some(it => it.importBatch === STOK_BARANG_BACKFILL_BATCH);
+}
+
+/** Tambahkan kategori belanja "Stok Barang Koperasi" (beli stok besar yang tak terikat satu PO harian,
+ * mis. beli minyak 14 dus sekaligus) sebagai biayaOperasional BARU untuk arsip April-Agustus yang SUDAH
+ * lebih dulu di-import -- supaya "Total Profit Real" ikut terkoreksi (kategori ini tidak pernah ikut
+ * ter-import sebelumnya). Tidak menyentuh/menduplikasi data PO/Pembelian/biaya lain yang sudah ada. */
+async function importStokBarangBackfill() {
+  if (isStokBarangBackfillImported()) { alert('Backfill ini sudah pernah diimpor sebelumnya.'); return; }
+  if (!confirm(`Tambahkan ${STOK_BARANG_BACKFILL_DATA.length} catatan "Stok Barang Koperasi" (April-Agustus) sebagai Biaya Operasional baru? Ini mengoreksi Total Profit Real yang sebelumnya belum memperhitungkan kategori ini.`)) return;
+
+  const btn = document.getElementById('btnImportStokBarangBackfill');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menambahkan...'; }
+  try {
+    const batch = writeBatch(state.db);
+    STOK_BARANG_BACKFILL_DATA.forEach(x => {
+      const ref = doc(collection(state.db, 'biayaOperasional'));
+      batch.set(ref, {
+        tanggal: x.tanggal, lokasi: x.tujuanSppg, kategori: x.kategori, keterangan: x.keterangan, jumlah: x.jumlah,
+        createdAt: serverTimestamp(), createdBy: state.currentUserEmail, importBatch: STOK_BARANG_BACKFILL_BATCH,
+      });
+    });
+    await batch.commit();
+    logActivity({
+      action: 'tambah', modul: 'Koperasi - Biaya Operasional',
+      ringkasan: `Backfill ${STOK_BARANG_BACKFILL_DATA.length} biaya "Stok Barang Koperasi" (arsip April-Agustus)`,
+    });
+    alert(`Selesai. ${STOK_BARANG_BACKFILL_DATA.length} catatan Stok Barang Koperasi berhasil ditambahkan.`);
+  } catch (e) {
+    console.error('Gagal import backfill stok barang', e);
+    alert('Gagal mengimpor. Pastikan Anda sudah login dan aturan Firestore sudah benar.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Tambahkan Sekarang'; }
+  }
 }
 
 /** Semua catatan Pembelian yang ditautkan ke barang PO tertentu (poId + itemId). */
@@ -1765,5 +1916,7 @@ export function initPoSppgEvents() {
   document.getElementById('btnDownloadPo').addEventListener('click', downloadLaporanPo);
   document.getElementById('btnImportArsipPo').addEventListener('click', importArsipLama);
   document.getElementById('btnBackfillPembelianPo').addEventListener('click', backfillDraftPembelianPoLama);
+  document.getElementById('btnImportArsipSeptOkt').addEventListener('click', importArsipSeptOkt);
+  document.getElementById('btnImportStokBarangBackfill').addEventListener('click', importStokBarangBackfill);
   resetItemRows();
 }
