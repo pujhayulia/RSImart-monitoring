@@ -164,7 +164,10 @@ export function notaInRange(dari, sampai) {
 function filteredNota() {
   const dari = document.getElementById('sppgFilterDari').value;
   const sampai = document.getElementById('sppgFilterSampai').value;
-  return notaInRange(dari, sampai);
+  const dapur = document.getElementById('sppgFilterDapur').value.trim().toLowerCase();
+  const list = notaInRange(dari, sampai);
+  if (!dapur) return list;
+  return list.filter(nota => (nota.tujuanSppg || '').toLowerCase().includes(dapur));
 }
 
 /** Kumpulkan/flatten semua item dari semua nota yang diberikan — dipakai untuk total, bukan menghitung jumlah nota. */
@@ -429,7 +432,7 @@ export function renderDistribusiSppg() {
   if (totalItemEl) totalItemEl.textContent = String(items.length);
 
   if (notaList.length === 0) {
-    logEl.innerHTML = `<div class="empty-state">Belum ada nota distribusi ke SPPG untuk rentang tanggal ini.</div>`;
+    logEl.innerHTML = `<div class="empty-state">Belum ada nota distribusi ke SPPG untuk filter ini.</div>`;
     return;
   }
 
@@ -650,7 +653,7 @@ export function downloadLaporanDistribusiSppg() {
   const notaList = filteredNota();
 
   if (notaList.length === 0) {
-    alert('Tidak ada data distribusi ke SPPG untuk rentang tanggal ini.');
+    alert('Tidak ada data distribusi ke SPPG untuk filter ini.');
     return;
   }
 
@@ -681,9 +684,11 @@ export function initDistribusiSppgEvents() {
   document.getElementById('sppgFilterSampai').value = sampai;
   document.getElementById('sppgFilterDari').addEventListener('change', renderDistribusiSppg);
   document.getElementById('sppgFilterSampai').addEventListener('change', renderDistribusiSppg);
+  document.getElementById('sppgFilterDapur').addEventListener('input', renderDistribusiSppg);
   document.getElementById('btnSppgFilterReset').addEventListener('click', () => {
     document.getElementById('sppgFilterDari').value = '';
     document.getElementById('sppgFilterSampai').value = '';
+    document.getElementById('sppgFilterDapur').value = '';
     renderDistribusiSppg();
   });
   document.getElementById('btnDownloadSppg').addEventListener('click', downloadLaporanDistribusiSppg);

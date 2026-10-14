@@ -68,6 +68,26 @@ function refreshAllRowPoItemSelects() {
   document.querySelectorAll('#pembelianItemRows .nota-item-row').forEach(populateRowPoItemSelect);
 }
 
+/** Dipanggil saat "Kaitkan ke PO" dipilih (bukan saat mode edit): ganti baris kosong dengan satu baris
+ * per barang PO itu, nama/jumlah-sisa/satuan terisi otomatis — supaya tidak perlu ketik & pilih satu-satu.
+ * Jumlah yang sudah terbeli (dari pembelian lain yang sudah tercatat) dikurangi dari jumlah pesan; barang
+ * yang sudah terbeli penuh tidak dibuatkan baris. Harga sengaja dikosongkan — itu harga beli ke toko,
+ * beda dari harga PO (harga jual ke SPPG), jadi tidak bisa diisi otomatis dari PO.
+ */
+function autoFillRowsFromPo(poId) {
+  const po = (state.lastPoSppgItems || []).find(p => p.id === poId);
+  document.getElementById('pembelianItemRows').innerHTML = '';
+  rowCounter = 0;
+  (po?.items || []).forEach((it, idx) => {
+    const key = poItemKeyLocal(it, idx);
+    const jumlahOrder = typeof it.jumlah === 'number' ? it.jumlah : 0;
+    const sisa = jumlahOrder - jumlahDibeliUntukPoItem(po.id, key, editingId);
+    if (sisa <= 0) return; // sudah terbeli penuh, tidak perlu baris lagi
+    addItemRow({ namaBarang: it.namaBarang, jumlah: sisa, satuan: it.satuan, poItemId: key });
+  });
+  if (document.getElementById('pembelianItemRows').children.length === 0) addItemRow();
+}
+
 /** Saat "Untuk barang PO ini" dipilih di satu baris, isi otomatis nama barang & satuannya dari PO. */
 function applyPoItemToRow(row) {
   const itemSel = row.querySelector('.nir-poitem');
@@ -179,11 +199,22 @@ export function pembelianTanggalDisplay(it) {
   return formatTimestamp(it.createdAt);
 }
 
+/** Nama dapur/SPPG tujuan satu pembelian — hanya ada kalau pembelian ini dikaitkan ke sebuah PO (dapur
+ * bukan field milik Pembelian sendiri, karena satu pembelian bisa jadi stok umum, bukan untuk SPPG tertentu). */
+function dapurUntukPembelian(it) {
+  const po = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
+  return po ? po.tujuanSppg : '';
+}
+
 function filteredPembelian() {
   const dari = document.getElementById('pembelianFilterDari').value;
   const sampai = document.getElementById('pembelianFilterSampai').value;
-  if (!dari && !sampai) return state.lastPembelianItems;
-  return state.lastPembelianItems.filter(it => isDateStrInRange(pembelianTanggalIso(it), dari, sampai));
+  const dapur = document.getElementById('pembelianFilterDapur').value.trim().toLowerCase();
+  return state.lastPembelianItems.filter(it => {
+    if ((dari || sampai) && !isDateStrInRange(pembelianTanggalIso(it), dari, sampai)) return false;
+    if (dapur && !dapurUntukPembelian(it).toLowerCase().includes(dapur)) return false;
+    return true;
+  });
 }
 
 /** Total belanja & jumlah transaksi dalam rentang tanggal (kosongkan dari/sampai untuk semua data) — dipakai di Beranda Koperasi. */
@@ -224,7 +255,7 @@ export function renderPembelian() {
   if (totalTransaksiEl) totalTransaksiEl.textContent = String(items.length);
 
   if (items.length === 0) {
-    logEl.innerHTML = `<div class="empty-state">Belum ada catatan pembelian untuk rentang tanggal ini.</div>`;
+    logEl.innerHTML = `<div class="empty-state">Belum ada catatan pembelian untuk filter ini.</div>`;
     return;
   }
 
@@ -399,7 +430,7 @@ export function downloadLaporanPembelian() {
   const items = filteredPembelian();
 
   if (items.length === 0) {
-    alert('Tidak ada data pembelian untuk rentang tanggal ini.');
+    alert('Tidak ada data pembelian untuk filter ini.');
     return;
   }
 
@@ -430,14 +461,20 @@ export function initPembelianEvents() {
   document.getElementById('pembelianFilterSampai').value = sampai;
   document.getElementById('pembelianFilterDari').addEventListener('change', renderPembelian);
   document.getElementById('pembelianFilterSampai').addEventListener('change', renderPembelian);
+  document.getElementById('pembelianFilterDapur').addEventListener('input', renderPembelian);
   document.getElementById('btnPembelianFilterReset').addEventListener('click', () => {
     document.getElementById('pembelianFilterDari').value = '';
     document.getElementById('pembelianFilterSampai').value = '';
+    document.getElementById('pembelianFilterDapur').value = '';
     renderPembelian();
   });
   document.getElementById('btnDownloadPembelian').addEventListener('click', downloadLaporanPembelian);
   document.getElementById('btnCancelEditPembelian').addEventListener('click', cancelEditPembelian);
-  document.getElementById('pembelianPoId').addEventListener('change', refreshAllRowPoItemSelects);
+  document.getElementById('pembelianPoId').addEventListener('change', () => {
+    if (editingId) { refreshAllRowPoItemSelects(); return; } // mode edit: tetap satu baris, jangan ganti jadi banyak
+    const poId = document.getElementById('pembelianPoId').value;
+    if (poId) autoFillRowsFromPo(poId); else resetItemRows();
+  });
   resetItemRows();
   refreshPoOptions();
 }

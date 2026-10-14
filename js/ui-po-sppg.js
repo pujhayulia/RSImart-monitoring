@@ -772,9 +772,11 @@ function filteredPo() {
   const dari = document.getElementById('poFilterDari').value;
   const sampai = document.getElementById('poFilterSampai').value;
   const status = document.getElementById('poFilterStatus').value;
+  const dapur = document.getElementById('poFilterDapur').value.trim().toLowerCase();
   return state.lastPoSppgItems.filter(po => {
     if (status !== 'all' && po.status !== status) return false;
     if ((dari || sampai) && !isDateStrInRange(po.tanggalPo, dari, sampai)) return false;
+    if (dapur && !(po.tujuanSppg || '').toLowerCase().includes(dapur)) return false;
     return true;
   });
 }
@@ -1651,10 +1653,12 @@ export function initPoSppgEvents() {
   ['poFilterStatus', 'poFilterDari', 'poFilterSampai'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderPoSppg);
   });
+  document.getElementById('poFilterDapur').addEventListener('input', renderPoSppg);
   document.getElementById('btnPoFilterReset').addEventListener('click', () => {
     document.getElementById('poFilterStatus').value = 'all';
     document.getElementById('poFilterDari').value = '';
     document.getElementById('poFilterSampai').value = '';
+    document.getElementById('poFilterDapur').value = '';
     renderPoSppg();
   });
   document.getElementById('btnDownloadPo').addEventListener('click', downloadLaporanPo);
