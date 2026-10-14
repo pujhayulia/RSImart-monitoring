@@ -184,6 +184,9 @@
         <a href="#/koperasi/distribusisppg" class="sidebar-link" data-module="koperasi" data-page="distribusisppg"><span class="sidebar-link-icon">🥬</span>Distribusi ke SPPG</a>
         <a href="#/koperasi/biayaoperasional" class="sidebar-link" data-module="koperasi" data-page="biayaoperasional"><span class="sidebar-link-icon">🚛</span>Biaya Operasional</a>
         <a href="#/koperasi/laporankeuangan" class="sidebar-link" data-module="koperasi" data-page="laporankeuangan"><span class="sidebar-link-icon">📊</span>Laporan Keuangan Koperasi</a>
+        <a href="#/koperasi/masterbarang" class="sidebar-link" data-module="koperasi" data-page="masterbarang"><span class="sidebar-link-icon">📦</span>Master Barang</a>
+        <a href="#/koperasi/supplier" class="sidebar-link" data-module="koperasi" data-page="supplier"><span class="sidebar-link-icon">🏪</span>Data Supplier</a>
+        <a href="#/koperasi/stokbarang" class="sidebar-link" data-module="koperasi" data-page="stokbarang"><span class="sidebar-link-icon">🗃️</span>Stok Barang</a>
       </nav>
 
       <nav class="sidebar-nav-shared" aria-label="Navigasi bersama">
@@ -620,6 +623,7 @@
           <option value="ikat"><option value="papan"><option value="dus"><option value="karung">
         </datalist>
         <datalist id="tokoList"></datalist>
+        <datalist id="masterBarangList"></datalist>
 
         <!-- PO DARI SPPG -->
         <section class="page" data-module="koperasi" data-page="posppg" id="page-koperasi-posppg">
@@ -1008,6 +1012,238 @@
           </div>
         </section>
 
+        <!-- MASTER BARANG -->
+        <section class="page" data-module="koperasi" data-page="masterbarang" id="page-koperasi-masterbarang">
+          <div class="section-head">
+            <div class="eyebrow">Database Koperasi</div>
+            <h2>Master Barang</h2>
+            <p>Daftar referensi bahan baku yang biasa dibeli dapur SPPG dari koperasi — harga PO, harga beli koperasi, dan margin. Dipakai untuk isi otomatis harga di PO dari SPPG &amp; Pembelian Bahan Makanan, tapi tetap bisa diedit kapan saja.</p>
+          </div>
+
+          <div class="totals-row koperasi-totals" style="grid-template-columns:1fr;">
+            <div class="total-card">
+              <div class="lbl">Jumlah Barang</div>
+              <div class="val" id="mbTotalBarang">–</div>
+            </div>
+          </div>
+
+          <div class="shared-note po-import-bar hidden" id="mbImportBar">
+            <span>📦 Ada arsip Master Barang dari Excel klien yang belum diimpor.</span>
+            <button type="button" class="btn-ghost" id="btnImportArsipMb">Import Arsip dari Klien</button>
+          </div>
+
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Tambah/Edit Barang</h3>
+              <div class="dist-field">
+                <label for="mbSumber">Sumber Bahan Baku</label>
+                <select id="mbSumber">
+                  <option value="">— Pilih —</option>
+                  <option value="GROSIR">Grosir</option>
+                  <option value="UMKM">UMKM</option>
+                  <option value="PASAR INDUK">Pasar Induk</option>
+                  <option value="PABRIK">Pabrik</option>
+                </select>
+              </div>
+              <div class="dist-field">
+                <label for="mbNama">Nama Barang</label>
+                <input id="mbNama" placeholder="Mis. Beras">
+              </div>
+              <div class="dist-field">
+                <label for="mbSatuan">Satuan</label>
+                <input id="mbSatuan" list="satuanList" placeholder="Mis. kg">
+              </div>
+              <div class="dist-field">
+                <label for="mbHargaPo">Harga PO Dapur (per satuan)</label>
+                <input type="number" id="mbHargaPo" placeholder="0">
+              </div>
+              <div class="dist-field">
+                <label for="mbHargaBeli">Harga Beli Koperasi (per satuan)</label>
+                <input type="number" id="mbHargaBeli" placeholder="0">
+              </div>
+              <div class="dist-field">
+                <label for="mbSup1Nama">Supplier 1 (Utama)</label>
+                <input id="mbSup1Nama" list="tokoList" placeholder="Nama toko/supplier">
+              </div>
+              <div class="dist-field">
+                <label for="mbSup1Kontak">Kontak Supplier 1</label>
+                <input id="mbSup1Kontak" placeholder="No. HP (opsional)">
+              </div>
+              <div class="dist-field">
+                <label for="mbSup2Nama">Supplier 2 (Cadangan)</label>
+                <input id="mbSup2Nama" list="tokoList" placeholder="Nama toko/supplier (opsional)">
+              </div>
+              <div class="dist-field">
+                <label for="mbSup2Kontak">Kontak Supplier 2</label>
+                <input id="mbSup2Kontak" placeholder="No. HP (opsional)">
+              </div>
+              <div class="dist-field">
+                <label for="mbKet">Keterangan (opsional)</label>
+                <textarea id="mbKet" rows="2" placeholder="Catatan tambahan"></textarea>
+              </div>
+              <button type="button" class="btn btn--block" id="btnSaveMb">Simpan Barang</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditMb">Batal Edit</button>
+              <div class="shared-note">Margin dihitung otomatis (Harga PO − Harga Beli), tidak perlu diisi manual.</div>
+            </div>
+            <div>
+              <div class="date-filter-row">
+                <input type="text" id="mbFilterCari" placeholder="Cari nama barang...">
+                <select id="mbFilterSumber">
+                  <option value="all">Semua Sumber</option>
+                  <option value="GROSIR">Grosir</option>
+                  <option value="UMKM">UMKM</option>
+                  <option value="PASAR INDUK">Pasar Induk</option>
+                  <option value="PABRIK">Pabrik</option>
+                </select>
+                <button type="button" class="filter-reset" id="btnMbFilterReset">Reset</button>
+                <button type="button" class="btn-ghost download-btn" id="btnDownloadMb">⬇ Download (CSV)</button>
+              </div>
+              <div class="dist-log" id="mbLog"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DATA SUPPLIER -->
+        <section class="page" data-module="koperasi" data-page="supplier" id="page-koperasi-supplier">
+          <div class="section-head">
+            <div class="eyebrow">Database Koperasi</div>
+            <h2>Data Supplier</h2>
+            <p>Daftar toko/supplier sumber belanja koperasi beserta kontak &amp; area pengantaran.</p>
+          </div>
+
+          <div class="totals-row koperasi-totals" style="grid-template-columns:1fr;">
+            <div class="total-card alt">
+              <div class="lbl">Jumlah Supplier</div>
+              <div class="val" id="supTotal">–</div>
+            </div>
+          </div>
+
+          <div class="shared-note po-import-bar hidden" id="supImportBar">
+            <span>🏪 Ada arsip Data Supplier dari Excel klien yang belum diimpor.</span>
+            <button type="button" class="btn-ghost" id="btnImportArsipSup">Import Arsip dari Klien</button>
+          </div>
+
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Tambah/Edit Supplier</h3>
+              <div class="dist-field">
+                <label for="supKomoditas">Komoditas Bahan</label>
+                <input id="supKomoditas" placeholder="Mis. Ayam, Sayur, dsb">
+              </div>
+              <div class="dist-field">
+                <label for="supNamaToko">Nama Toko/Usaha</label>
+                <input id="supNamaToko" placeholder="Nama toko/usaha">
+              </div>
+              <div class="dist-field">
+                <label for="supNamaPemilik">Nama Pemilik</label>
+                <input id="supNamaPemilik" placeholder="Nama pemilik">
+              </div>
+              <div class="dist-field">
+                <label for="supTelp">No. Telp</label>
+                <input id="supTelp" type="tel" placeholder="0812xxxxxxx">
+              </div>
+              <div class="dist-field">
+                <label for="supJenis">Jenis Supplier</label>
+                <select id="supJenis">
+                  <option value="UMKM">UMKM</option>
+                  <option value="GROSIR">Grosir</option>
+                  <option value="PASAR INDUK">Pasar Induk</option>
+                  <option value="PABRIK">Pabrik</option>
+                </select>
+              </div>
+              <div class="dist-field">
+                <label for="supAlamat">Alamat</label>
+                <textarea id="supAlamat" rows="2" placeholder="Alamat lengkap"></textarea>
+              </div>
+              <div class="dist-field">
+                <label for="supPengantaran">Pengantaran</label>
+                <input id="supPengantaran" placeholder="Mis. Di Antar / Di Ambil">
+              </div>
+              <div class="dist-field">
+                <label for="supArea">Supplier Dapur / Area</label>
+                <input id="supArea" placeholder="Mis. Ciledug-Meruya, Nambo">
+              </div>
+              <div class="dist-field">
+                <label for="supKode">Kode Pembelian</label>
+                <input id="supKode" placeholder="Mis. AYM-SUP-002">
+              </div>
+              <div class="dist-field">
+                <label for="supCatatan">Catatan (opsional)</label>
+                <textarea id="supCatatan" rows="2" placeholder="Catatan tambahan"></textarea>
+              </div>
+              <button type="button" class="btn btn--block" id="btnSaveSup">Simpan Supplier</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditSup">Batal Edit</button>
+            </div>
+            <div>
+              <div class="date-filter-row">
+                <input type="text" id="supFilterCari" placeholder="Cari nama toko/komoditas/area...">
+                <button type="button" class="filter-reset" id="btnSupFilterReset">Reset</button>
+                <button type="button" class="btn-ghost download-btn" id="btnDownloadSup">⬇ Download (CSV)</button>
+              </div>
+              <div class="dist-log" id="supLog"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- STOK BARANG (KOPERASI) -->
+        <section class="page" data-module="koperasi" data-page="stokbarang" id="page-koperasi-stokbarang">
+          <div class="section-head">
+            <div class="eyebrow">Database Koperasi</div>
+            <h2>Stok Barang</h2>
+            <p>Catatan stok bahan baku per lokasi/dapur koperasi — terpisah dari Stok Gudang RSI (untuk produk Air ARSI).</p>
+          </div>
+
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Catat Stok</h3>
+              <div class="dist-field">
+                <label for="sbLokasi">Lokasi / Dapur</label>
+                <input id="sbLokasi" list="lokasiList" placeholder="Mis. Ciledug, Nambo">
+              </div>
+              <div class="dist-field">
+                <label for="sbPic">PIC (opsional)</label>
+                <input id="sbPic" placeholder="Nama PIC">
+              </div>
+              <div class="dist-field">
+                <label for="sbBarang">Nama Barang</label>
+                <input id="sbBarang" list="masterBarangList" placeholder="Nama barang">
+              </div>
+              <div class="dist-field">
+                <label for="sbSatuan">Satuan</label>
+                <input id="sbSatuan" list="satuanList" placeholder="Mis. kg, duz">
+              </div>
+              <div class="dist-field">
+                <label for="sbIsi">Isi (opsional)</label>
+                <input id="sbIsi" placeholder="Mis. 2lt x6pouch">
+              </div>
+              <div class="dist-field">
+                <label for="sbStokAwal">Stok Awal</label>
+                <input type="number" id="sbStokAwal" placeholder="0">
+              </div>
+              <div class="dist-field">
+                <label for="sbMasuk">Masuk</label>
+                <input type="number" id="sbMasuk" placeholder="0">
+              </div>
+              <div class="dist-field">
+                <label for="sbKeluar">Keluar</label>
+                <input type="number" id="sbKeluar" placeholder="0">
+              </div>
+              <button type="button" class="btn btn--block" id="btnSaveSb">Simpan Stok</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditSb">Batal Edit</button>
+              <div class="shared-note">Stok Akhir dihitung otomatis: Stok Awal + Masuk − Keluar.</div>
+            </div>
+            <div>
+              <div class="date-filter-row">
+                <input type="text" id="sbFilterCari" placeholder="Cari nama barang...">
+                <select id="sbFilterLokasi"><option value="">Semua Lokasi</option></select>
+                <button type="button" class="filter-reset" id="btnSbFilterReset">Reset</button>
+                <button type="button" class="btn-ghost download-btn" id="btnDownloadSb">⬇ Download (CSV)</button>
+              </div>
+              <div class="dist-log" id="sbLog"></div>
+            </div>
+          </div>
+        </section>
+
         <!-- ===== BERSAMA (bisa diakses dari modul mana pun) ===== -->
 
         <!-- RIWAYAT AKTIVITAS -->
@@ -1047,6 +1283,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=60"></script>
+<script type="module" src="js/main.js?v=61"></script>
 </body>
 </html>

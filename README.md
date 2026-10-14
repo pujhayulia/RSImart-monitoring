@@ -130,6 +130,18 @@ sembarang orang dari luar situs Anda.
          allow read: if true;
          allow write: if request.auth != null;
        }
+       match /masterBarang/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /supplierKoperasi/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /stokBarangKoperasi/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
      }
    }
    ```

@@ -19,7 +19,7 @@ import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog, upda
 import { initImportDistribusiEvents } from './ui-import-distribusi.js';
 import { renderKeuangan, initKeuanganReportEvents } from './ui-keuangan.js';
 import { renderBeranda } from './ui-beranda.js';
-import { watchPembelian, initPembelianEvents, refreshPoOptions } from './ui-pembelian.js';
+import { watchPembelian, initPembelianEvents, refreshPoOptions, renderPembelian } from './ui-pembelian.js';
 import { watchDistribusiSppg, initDistribusiSppgEvents, prefillFromPo } from './ui-distribusi-sppg.js';
 import { watchPoSppg, initPoSppgEvents } from './ui-po-sppg.js';
 import { watchBiayaOperasional, initBiayaOperasionalEvents } from './ui-biaya-operasional.js';
@@ -30,6 +30,9 @@ import {
 } from './ui-laporan-keuangan-koperasi.js';
 import { watchActivityLog, initActivityLogEvents } from './activity-log.js';
 import { initBuktiBayarEvents } from './ui-bukti-bayar.js';
+import { watchMasterBarang, initMasterBarangEvents } from './ui-master-barang.js';
+import { watchSupplier, initSupplierEvents } from './ui-supplier-koperasi.js';
+import { watchStokBarang, initStokBarangEvents } from './ui-stok-barang-koperasi.js';
 
 const configLooksEmpty = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('GANTI_DENGAN');
 
@@ -90,6 +93,9 @@ function initEvents() {
   initActivityLogEvents();
   initBackupEvents();
   initBuktiBayarEvents();
+  initMasterBarangEvents();
+  initSupplierEvents();
+  initStokBarangEvents();
 }
 
 function onGudangChange() {
@@ -108,6 +114,7 @@ function onKoperasiDataChange() {
   renderLaporanKeuanganKoperasi();
   renderLandingStats();
   refreshPoOptions();
+  renderPembelian(); // ikut menyegarkan saran harga (dari Master Barang) & datalist toko (dari Data Supplier)
 }
 
 function onProdukHargaChange() {
@@ -127,6 +134,9 @@ async function startAppData() {
     watchDistribusi(onDistribusiChange);
     watchPoSppg(onKoperasiDataChange);
     watchBiayaOperasional(onKoperasiDataChange);
+    watchMasterBarang(onKoperasiDataChange);
+    watchSupplier(onKoperasiDataChange);
+    watchStokBarang(onKoperasiDataChange);
     watchPembelian(onKoperasiDataChange);
     watchDistribusiSppg(onKoperasiDataChange);
     watchActivityLog();

@@ -17,6 +17,7 @@ import { downloadCsv, dateRangeFileTag } from './csv-export.js';
 import { printReport, simpanSebagaiGambar } from './print-report.js';
 import { navigateTo } from './router.js';
 import { MARGIN_LAMA_BATCH, MARGIN_LAMA_DATA } from './margin-lama-data.js';
+import { cariMasterBarang } from './ui-master-barang.js';
 
 // Batch lama (sebelum ada data pembelian/margin) — dibersihkan otomatis saat arsip baru diimpor.
 const OLD_PO_LAMA_BATCH = 'arsip-po-2026-08';
@@ -134,7 +135,7 @@ let invoiceExpandId = null; // PO yang sedang dibuka form Potongan/PPN sebelum c
 function itemRowHtml(rowId) {
   return `
     <div class="nota-item-row" data-rowid="${rowId}">
-      <input class="nir-nama" placeholder="Nama barang">
+      <input class="nir-nama" list="masterBarangList" placeholder="Nama barang">
       <div class="nota-item-row-sub">
         <input class="nir-jumlah" type="number" placeholder="Jumlah">
         <input class="nir-satuan" list="satuanList" placeholder="Satuan">
@@ -144,12 +145,25 @@ function itemRowHtml(rowId) {
     </div>`;
 }
 
+/** Barang yang namanya cocok persis dengan Master Barang: isi otomatis Harga Rencana & Satuan (dari
+ * Harga PO Dapur) kalau field itu masih kosong — tidak menimpa yang sudah diisi manual. */
+function terapkanMasterBarangKeBaris(row) {
+  const nama = row.querySelector('.nir-nama').value;
+  const master = cariMasterBarang(nama);
+  if (!master) return;
+  const hargaEl = row.querySelector('.nir-harga');
+  const satuanEl = row.querySelector('.nir-satuan');
+  if (!hargaEl.value && typeof master.hargaPoDapur === 'number') hargaEl.value = master.hargaPoDapur;
+  if (!satuanEl.value && master.satuan) satuanEl.value = master.satuan;
+}
+
 function addItemRow(prefill) {
   rowCounter += 1;
   const wrap = document.getElementById('poItemRows');
   wrap.insertAdjacentHTML('beforeend', itemRowHtml(rowCounter));
   const row = wrap.querySelector(`.nota-item-row[data-rowid="${rowCounter}"]`);
   row.querySelector('.nir-remove').addEventListener('click', () => removeItemRow(rowCounter));
+  row.querySelector('.nir-nama').addEventListener('change', () => terapkanMasterBarangKeBaris(row));
   if (prefill) {
     row.querySelector('.nir-nama').value = prefill.namaBarang || '';
     row.querySelector('.nir-jumlah').value = prefill.jumlah ?? '';

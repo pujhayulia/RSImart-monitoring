@@ -24,6 +24,12 @@ export const state = {
   poPrefill: null, // PO yang sedang dibuatkan nota pengiriman — dibaca sekali oleh halaman Distribusi SPPG lalu dikosongkan
   biayaOperasionalUnsub: null,
   lastBiayaOperasionalItems: [],
+  masterBarangUnsub: null,
+  lastMasterBarangItems: [],
+  supplierUnsub: null,
+  lastSupplierItems: [],
+  stokBarangUnsub: null,
+  lastStokBarangItems: [],
   activityLogUnsub: null,
   lastActivityLog: [],
   authMode: 'login', // 'login' | 'register'

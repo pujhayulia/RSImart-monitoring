@@ -24,6 +24,9 @@ export const MODULES = {
       distribusisppg: 'Distribusi ke SPPG',
       biayaoperasional: 'Biaya Operasional',
       laporankeuangan: 'Laporan Keuangan Koperasi',
+      masterbarang: 'Master Barang',
+      supplier: 'Data Supplier',
+      stokbarang: 'Stok Barang',
     },
   },
 };

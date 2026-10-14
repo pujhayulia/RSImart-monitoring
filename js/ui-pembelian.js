@@ -8,6 +8,7 @@ import { state } from './state.js';
 import { formatRupiah, formatDate, formatTimestamp, isDateStrInRange, timestampToLocalDateIso, escapeHtml, monthRange } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { downloadCsv, dateRangeFileTag } from './csv-export.js';
+import { cariMasterBarang } from './ui-master-barang.js';
 
 const FIELD_IDS = ['NamaToko', 'NoHp', 'AlamatToko', 'NamaPembeli', 'Catatan'];
 
@@ -104,7 +105,7 @@ function applyPoItemToRow(row) {
 function itemRowHtml(rowId) {
   return `
     <div class="nota-item-row" data-rowid="${rowId}">
-      <input class="nir-nama" placeholder="Nama barang">
+      <input class="nir-nama" list="masterBarangList" placeholder="Nama barang">
       <div class="nota-item-row-sub">
         <input class="nir-jumlah" type="number" placeholder="Jumlah">
         <input class="nir-satuan" list="satuanList" placeholder="Satuan">
@@ -115,6 +116,20 @@ function itemRowHtml(rowId) {
     </div>`;
 }
 
+/** Barang yang namanya cocok persis dengan Master Barang: isi otomatis Satuan, dan Harga total
+ * (Harga Beli Koperasi per satuan × Jumlah) kalau field-field itu masih kosong. */
+function terapkanMasterBarangKeBaris(row) {
+  const master = cariMasterBarang(row.querySelector('.nir-nama').value);
+  if (!master) return;
+  const satuanEl = row.querySelector('.nir-satuan');
+  if (!satuanEl.value && master.satuan) satuanEl.value = master.satuan;
+  const hargaEl = row.querySelector('.nir-harga');
+  const jumlah = Number(row.querySelector('.nir-jumlah').value);
+  if (!hargaEl.value && jumlah > 0 && typeof master.hargaBeliKoperasi === 'number') {
+    hargaEl.value = Math.round(master.hargaBeliKoperasi * jumlah);
+  }
+}
+
 function addItemRow(prefill) {
   rowCounter += 1;
   const wrap = document.getElementById('pembelianItemRows');
@@ -122,6 +137,8 @@ function addItemRow(prefill) {
   const row = wrap.querySelector(`.nota-item-row[data-rowid="${rowCounter}"]`);
   row.querySelector('.nir-remove').addEventListener('click', () => removeItemRow(rowCounter));
   row.querySelector('.nir-poitem').addEventListener('change', () => applyPoItemToRow(row));
+  row.querySelector('.nir-nama').addEventListener('change', () => terapkanMasterBarangKeBaris(row));
+  row.querySelector('.nir-jumlah').addEventListener('input', () => terapkanMasterBarangKeBaris(row));
   populateRowPoItemSelect(row);
   if (prefill) {
     row.querySelector('.nir-nama').value = prefill.namaBarang || '';
@@ -236,18 +253,19 @@ export function computePembelianSummary(dari, sampai) {
 }
 
 /** Isi ulang datalist "Nama Toko" dari nama-nama toko unik yang pernah dipakai — tanpa collection Firestore terpisah. */
+/** Datalist nama toko: gabungan nama toko yang pernah dipakai di Pembelian + daftar di Data Supplier —
+ * supaya toko yang sudah terdaftar di Data Supplier langsung bisa diketik cepat juga di sini. */
 function refreshTokoOptions() {
   const list = document.getElementById('tokoList');
   if (!list) return;
   const seen = new Set();
   const names = [];
-  state.lastPembelianItems.forEach(it => {
-    const nama = (it.namaToko || '').trim();
-    if (nama && !seen.has(nama.toLowerCase())) {
-      seen.add(nama.toLowerCase());
-      names.push(nama);
-    }
-  });
+  const tambah = (nama) => {
+    const n = (nama || '').trim();
+    if (n && !seen.has(n.toLowerCase())) { seen.add(n.toLowerCase()); names.push(n); }
+  };
+  state.lastPembelianItems.forEach(it => tambah(it.namaToko));
+  (state.lastSupplierItems || []).forEach(it => tambah(it.namaTokoUsaha));
   names.sort((a, b) => a.localeCompare(b));
   list.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
 }
@@ -350,12 +368,17 @@ function poGroupCardHtml(po, items) {
 }
 
 function lengkapiSemuaFormHtml(po, draftItems) {
-  const rows = draftItems.map(it => `
+  const rows = draftItems.map(it => {
+    const master = cariMasterBarang(it.namaBarang);
+    const saran = master && typeof master.hargaBeliKoperasi === 'number' && typeof it.jumlah === 'number'
+      ? Math.round(master.hargaBeliKoperasi * it.jumlah) : '';
+    return `
     <div class="po-inline-row">
       <span>${escapeHtml(it.namaBarang)}</span>
       <span>${it.jumlah ?? '-'} ${escapeHtml(it.satuan || '')}</span>
-      <input type="number" class="lengkapi-harga" data-pembelianid="${it.id}" placeholder="Harga beli" min="0">
-    </div>`).join('');
+      <input type="number" class="lengkapi-harga" data-pembelianid="${it.id}" placeholder="Harga beli" min="0" value="${saran}">
+    </div>`;
+  }).join('');
   return `
     <div class="po-inline-form" data-lengkapiform="${po.id}">
       <h4>Isi info toko (berlaku untuk semua barang di bawah yang diisi harganya), lalu Simpan:</h4>
@@ -365,7 +388,7 @@ function lengkapiSemuaFormHtml(po, draftItems) {
         <input id="lengkapiAlamat-${po.id}" placeholder="Alamat Toko">
         <input id="lengkapiPembeli-${po.id}" placeholder="Nama Pembeli">
       </div>
-      <h4>Harga per barang (kosongkan barang yang tidak dibeli di toko ini):</h4>
+      <h4>Harga per barang (kosongkan barang yang tidak dibeli di toko ini) — angka yang sudah terisi hanya saran dari Master Barang, cek &amp; sesuaikan dengan harga beli sebenarnya:</h4>
       ${rows}
       <div class="po-inline-form-actions">
         <button type="button" class="btn-ghost" data-lengkapicancel="${po.id}">Batal</button>
