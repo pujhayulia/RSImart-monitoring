@@ -143,6 +143,34 @@ sembarang orang dari luar situs Anda.
 > mengisi), Firestore Rules bisa dipersempit lebih lanjut — tinggal beri tahu
 > saya kalau mau ditingkatkan.
 
+## Langkah 4b — Aktifkan Firebase Storage (untuk bukti bayar)
+
+Dipakai oleh fitur "Upload Bukti Bayar" di halaman Distribusi (Air ARSI) untuk menyimpan foto/PDF struk.
+
+1. Di menu kiri Firebase Console, buka **Storage** (biasanya persis di bawah Firestore Database).
+2. Klik **Get started**, pilih lokasi (samakan dengan lokasi Firestore Anda), lanjutkan dengan pengaturan default.
+3. Buka tab **Rules**, ganti isinya dengan:
+
+   ```text
+   rules_version = '2';
+   service firebase.storage {
+     match /b/{bucket}/o {
+       match /bukti-bayar/{pengirimanId}/{fileName} {
+         allow read: if true;
+         allow write: if request.auth != null && request.resource.size < 10 * 1024 * 1024;
+       }
+     }
+   }
+   ```
+
+4. Klik **Publish**.
+
+> Sama seperti Firestore Rules: siapa saja bisa melihat/membuka bukti bayar lewat link-nya, tapi
+> hanya yang sudah login yang bisa mengunggah, dan ukuran file dibatasi 10MB per file.
+
+Kalau langkah ini dilewati, tombol "Upload Bukti Bayar" akan gagal dengan pesan error saat dicoba
+(aplikasi lain tetap berjalan normal — ini tidak memengaruhi Firestore).
+
 ## Langkah 5 — Ambil konfigurasi & tempel ke `js/firebase-config.js`
 
 1. Di Firebase Console, klik ⚙️ **Project settings** (di pojok kiri atas, dekat "Project Overview").

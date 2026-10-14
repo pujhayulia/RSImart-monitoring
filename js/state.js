@@ -4,6 +4,7 @@ export const state = {
   app: null,
   db: null,
   auth: null,
+  storage: null,
   currentUserEmail: '',
   activeModule: null, // 'rsi' | 'koperasi' | null (null = layar pilih modul)
   currentDate: null,

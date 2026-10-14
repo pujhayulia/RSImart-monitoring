@@ -3,6 +3,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getStorage } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
 import { state, setStatus } from './state.js';
 import { todayIso, formatRupiah, monthRange } from './utils.js';
@@ -28,6 +29,7 @@ import {
   computeKoperasiKeuangan, renderLaporanKeuanganKoperasi, initLaporanKeuanganKoperasiEvents
 } from './ui-laporan-keuangan-koperasi.js';
 import { watchActivityLog, initActivityLogEvents } from './activity-log.js';
+import { initBuktiBayarEvents } from './ui-bukti-bayar.js';
 
 const configLooksEmpty = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('GANTI_DENGAN');
 
@@ -87,6 +89,7 @@ function initEvents() {
   initLaporanKeuanganKoperasiEvents();
   initActivityLogEvents();
   initBackupEvents();
+  initBuktiBayarEvents();
 }
 
 function onGudangChange() {
@@ -163,6 +166,7 @@ async function init() {
     state.app = initializeApp(firebaseConfig);
     state.db = getFirestore(state.app);
     state.auth = getAuth(state.app);
+    state.storage = getStorage(state.app);
 
     initAuthUI();
 

@@ -7,6 +7,7 @@ import { produkById, produkLabel, PRODUK } from './data.js';
 import { formatDate, formatRupiah, escapeHtml } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { cetakInvoicePengiriman } from './ui-invoice-rsi.js';
+import { triggerUploadBukti, hapusBuktiBayar } from './ui-bukti-bayar.js';
 
 function findDistItem(id) {
   return state.lastDistItems.find(it => it.id === id);
@@ -87,6 +88,12 @@ export function renderDistItemHtml(it, opts = {}) {
     : `<select class="metode-mini" data-metodefor="${it.id}" aria-label="Metode pembayaran">${METODE_OPTIONS}</select>
        <button class="pay-badge belum" data-id="${it.id}">Tandai Lunas</button>`;
 
+  const buktiAction = it.buktiBayarUrl
+    ? `<a class="btn-ghost bukti-link" href="${escapeHtml(it.buktiBayarUrl)}" target="_blank" rel="noopener" title="${escapeHtml(it.buktiBayarNama || '')}">📎 Lihat Bukti</a>
+       <button class="btn-ghost" data-buktiid="${it.id}" title="Ganti file bukti bayar">Ganti</button>
+       <button class="btn-ghost" data-buktihapusid="${it.id}" title="Hapus bukti bayar">🗑</button>`
+    : `<button class="btn-ghost" data-buktiid="${it.id}">📎 Upload Bukti Bayar</button>`;
+
   return `
     <div class="dist-item">
       <div class="left">
@@ -101,6 +108,9 @@ export function renderDistItemHtml(it, opts = {}) {
           <button class="btn-ghost invoice-gambar-btn" data-invoicegambarid="${it.id}" title="Simpan Invoice sebagai gambar PNG">🖼️</button>
           <button class="edit-btn" data-editid="${it.id}" title="Edit catatan ini">✏️</button>
           <button class="del-btn" data-delid="${it.id}" title="Hapus catatan ini">🗑</button>
+        </div>
+        <div class="dist-item-actions">
+          ${buktiAction}
         </div>
       </div>
     </div>
@@ -129,5 +139,11 @@ export function wireDistItemActions(containerEl) {
   });
   containerEl.querySelectorAll('button.invoice-gambar-btn').forEach(btn => {
     btn.addEventListener('click', () => cetakInvoicePengiriman(btn.dataset.invoicegambarid, 'gambar'));
+  });
+  containerEl.querySelectorAll('[data-buktiid]').forEach(btn => {
+    btn.addEventListener('click', () => triggerUploadBukti(btn.dataset.buktiid));
+  });
+  containerEl.querySelectorAll('[data-buktihapusid]').forEach(btn => {
+    btn.addEventListener('click', () => hapusBuktiBayar(btn.dataset.buktihapusid));
   });
 }
