@@ -13,6 +13,7 @@ const FIELD_IDS = ['NamaToko', 'NoHp', 'AlamatToko', 'NamaPembeli', 'Catatan'];
 
 let editingId = null;
 let rowCounter = 0;
+let lengkapiExpandPoId = null; // id PO yang sedang dibuka form "Lengkapi Semua"-nya di daftar riwayat
 
 /** Kunci stabil satu baris barang PO (sama dengan poItemKey() di ui-po-sppg.js, sengaja tidak diimpor supaya kedua modul tidak saling bergantung). */
 function poItemKeyLocal(item, index) {
@@ -251,6 +252,166 @@ function refreshTokoOptions() {
   list.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
 }
 
+function tsToMillis(ts) {
+  if (!ts) return 0;
+  return (typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts)).getTime();
+}
+
+/** Kelompokkan catatan Pembelian yang tertaut ke PO yang sama jadi satu kartu (seperti kartu PO dari
+ * SPPG) — tim lapangan lihat satu kartu per PO/dapur, bukan satu kartu terpisah per barang. Pembelian
+ * tanpa PO (belanja stok umum) tetap tampil sebagai kartu sendiri-sendiri seperti sebelumnya. */
+function groupPembelianItems(items) {
+  const groups = new Map(); // poId -> { po, items: [] }
+  const flat = [];
+  items.forEach(it => {
+    const po = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
+    if (!po) { flat.push({ sortKey: tsToMillis(it.createdAt), html: distItemCardHtml(it) }); return; }
+    if (!groups.has(po.id)) groups.set(po.id, { po, items: [] });
+    groups.get(po.id).items.push(it);
+  });
+  const grouped = [...groups.values()].map(g => ({
+    sortKey: Math.max(...g.items.map(it => tsToMillis(it.createdAt))),
+    html: poGroupCardHtml(g.po, g.items),
+  }));
+  return [...grouped, ...flat].sort((a, b) => b.sortKey - a.sortKey).map(x => x.html);
+}
+
+/** Satu kartu pembelian ad-hoc (tidak tertaut PO manapun) — layout lama, tak berubah. */
+function distItemCardHtml(it) {
+  const draft = belumLengkap(it);
+  const infoToko = draft
+    ? `<div class="meta belum-lengkap-badge">⚠️ Perlu Dilengkapi — belum ada toko &amp; harga</div>`
+    : `<div class="meta">${escapeHtml(it.namaToko)}${it.noHpToko ? ' · ' + escapeHtml(it.noHpToko) : ''}</div>
+       <div class="meta">${escapeHtml(it.alamatToko || '-')}</div>
+       <div class="meta">Dibeli oleh ${escapeHtml(it.namaPembeli)} · ${pembelianTanggalDisplay(it)}</div>`;
+  return `
+    <div class="dist-item${draft ? ' dist-item-draft' : ''}" data-pembelianitem="${it.id}">
+      <div class="left">
+        <b>${escapeHtml(it.namaBarang)}</b>
+        ${infoToko}
+        ${it.catatan ? `<div class="meta">Catatan: ${escapeHtml(it.catatan)}</div>` : ''}
+        ${it.createdBy ? `<div class="meta">Diinput oleh ${escapeHtml(it.createdBy)}</div>` : ''}
+      </div>
+      <div class="right">
+        <div class="qty">${it.jumlah} ${escapeHtml(it.satuan)}</div>
+        <div class="dist-item-total">${formatRupiah(it.harga)}</div>
+        <div class="dist-item-actions">
+          ${draft ? `<button class="btn lengkapi-btn" data-editid="${it.id}" title="Isi toko &amp; harga beli">Lengkapi</button>` : ''}
+          <button class="edit-btn" data-editid="${it.id}" title="Edit catatan ini">✏️</button>
+          <button class="del-btn" data-delid="${it.id}" title="Hapus catatan ini">🗑</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/** Satu kartu pembelian yang tertaut ke sebuah PO — dibuat semirip mungkin dengan kartu PO dari SPPG
+ * (reuse class .po-card dkk) supaya tampilannya konsisten dan langsung dikenali sebagai "satu PO". */
+function poGroupCardHtml(po, items) {
+  const draftItems = items.filter(belumLengkap);
+  const semuaLengkap = draftItems.length === 0;
+  const badge = semuaLengkap
+    ? `<span class="po-status-badge po-status-badge--disetujui">✓ Lengkap</span>`
+    : `<span class="po-status-badge po-status-badge--ditolak">⚠️ ${draftItems.length} Perlu Dilengkapi</span>`;
+
+  const itemsHtml = items.map(it => {
+    const draft = belumLengkap(it);
+    const hargaLabel = draft ? `<span class="belum-lengkap-badge">Perlu Dilengkapi</span>` : formatRupiah(it.harga);
+    const tokoLabel = draft ? '' : ` <span class="nota-detail-toko">· ${escapeHtml(it.namaToko)}</span>`;
+    return `
+    <div class="nota-detail-row nota-detail-row--pembelian">
+      <span class="nota-detail-nama">${escapeHtml(it.namaBarang)}${tokoLabel}</span>
+      <span class="nota-detail-qty">${it.jumlah ?? '-'} ${escapeHtml(it.satuan || '')}</span>
+      <span class="nota-detail-harga">${hargaLabel}</span>
+      <span class="nota-detail-actions">
+        <button class="edit-btn" data-editid="${it.id}" title="Edit catatan ini">✏️</button>
+        <button class="del-btn" data-delid="${it.id}" title="Hapus catatan ini">🗑</button>
+      </span>
+    </div>`;
+  }).join('');
+
+  const totalSelesai = items.filter(it => !belumLengkap(it)).reduce((s, it) => s + (typeof it.harga === 'number' ? it.harga : 0), 0);
+
+  return `
+    <div class="po-card" data-pembeliangroup="${po.id}">
+      <div class="po-card-head">
+        <div>
+          <b>${escapeHtml(po.tujuanSppg)}</b>
+          <div class="meta">PO: ${formatDate(po.tanggalPo)} · ${items.length} jenis barang</div>
+        </div>
+        ${badge}
+      </div>
+      <div class="po-card-items">${itemsHtml}</div>
+      ${totalSelesai > 0 ? `<div class="po-card-total">Total (yang selesai): ${formatRupiah(totalSelesai)}</div>` : ''}
+      ${lengkapiExpandPoId === po.id ? lengkapiSemuaFormHtml(po, draftItems) : ''}
+      <div class="po-card-actions">
+        ${!semuaLengkap && lengkapiExpandPoId !== po.id ? `<button type="button" class="btn" data-lengkapisemua="${po.id}">Lengkapi Semua (${draftItems.length})</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function lengkapiSemuaFormHtml(po, draftItems) {
+  const rows = draftItems.map(it => `
+    <div class="po-inline-row">
+      <span>${escapeHtml(it.namaBarang)}</span>
+      <span>${it.jumlah ?? '-'} ${escapeHtml(it.satuan || '')}</span>
+      <input type="number" class="lengkapi-harga" data-pembelianid="${it.id}" placeholder="Harga beli" min="0">
+    </div>`).join('');
+  return `
+    <div class="po-inline-form" data-lengkapiform="${po.id}">
+      <h4>Isi info toko (berlaku untuk semua barang di bawah yang diisi harganya), lalu Simpan:</h4>
+      <div class="form-grid">
+        <input id="lengkapiNamaToko-${po.id}" list="tokoList" placeholder="Nama Toko">
+        <input id="lengkapiNoHp-${po.id}" type="tel" placeholder="No. HP Toko (opsional)">
+        <input id="lengkapiAlamat-${po.id}" placeholder="Alamat Toko">
+        <input id="lengkapiPembeli-${po.id}" placeholder="Nama Pembeli">
+      </div>
+      <h4>Harga per barang (kosongkan barang yang tidak dibeli di toko ini):</h4>
+      ${rows}
+      <div class="po-inline-form-actions">
+        <button type="button" class="btn-ghost" data-lengkapicancel="${po.id}">Batal</button>
+        <button type="button" class="btn" data-lengkapisave="${po.id}">Simpan</button>
+      </div>
+    </div>`;
+}
+
+async function simpanLengkapiSemua(poId) {
+  const namaToko = document.getElementById(`lengkapiNamaToko-${poId}`).value.trim();
+  const noHpToko = document.getElementById(`lengkapiNoHp-${poId}`).value.trim();
+  const alamatToko = document.getElementById(`lengkapiAlamat-${poId}`).value.trim();
+  const namaPembeli = document.getElementById(`lengkapiPembeli-${poId}`).value.trim();
+  const hargaInputs = [...document.querySelectorAll(`[data-lengkapiform="${poId}"] .lengkapi-harga`)]
+    .map(inp => ({ id: inp.dataset.pembelianid, val: inp.value }))
+    .filter(x => x.val !== '');
+
+  if (hargaInputs.length === 0) { alert('Isi harga minimal satu barang dulu — kosongkan baris barang yang memang belum/tidak dibeli di toko ini.'); return; }
+  if (!namaToko || !alamatToko || !namaPembeli) { alert('Mohon isi nama toko, alamat toko, dan nama pembeli.'); return; }
+  if (hargaInputs.some(x => isNaN(Number(x.val)) || Number(x.val) < 0)) { alert('Harga tidak valid.'); return; }
+
+  const btn = document.querySelector(`[data-lengkapisave="${poId}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+  try {
+    const batch = writeBatch(state.db);
+    hargaInputs.forEach(({ id, val }) => {
+      batch.update(doc(state.db, 'pembelianBahanMakanan', id), {
+        namaToko, noHpToko, alamatToko, namaPembeli, harga: Number(val),
+        updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
+      });
+    });
+    await batch.commit();
+    const po = state.lastPoSppgItems.find(p => p.id === poId);
+    logActivity({
+      action: 'ubah', modul: 'Koperasi - Pembelian',
+      ringkasan: `Lengkapi ${hargaInputs.length} barang dari PO ${po ? po.tujuanSppg : poId} di Toko ${namaToko}`,
+    });
+    lengkapiExpandPoId = null;
+    renderPembelian();
+  } catch (e) {
+    console.error(e);
+    alert('Gagal menyimpan. Pastikan Anda sudah login dan aturan Firestore sudah benar.');
+    if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
+  }
+}
+
 export function renderPembelian() {
   refreshTokoOptions();
   const logEl = document.getElementById('pembelianLog');
@@ -275,35 +436,7 @@ export function renderPembelian() {
     return;
   }
 
-  logEl.innerHTML = items.map(it => {
-    const linkedPo = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
-    const draft = belumLengkap(it);
-    const infoToko = draft
-      ? `<div class="meta belum-lengkap-badge">⚠️ Perlu Dilengkapi — belum ada toko &amp; harga</div>`
-      : `<div class="meta">${escapeHtml(it.namaToko)}${it.noHpToko ? ' · ' + escapeHtml(it.noHpToko) : ''}</div>
-         <div class="meta">${escapeHtml(it.alamatToko || '-')}</div>
-         <div class="meta">Dibeli oleh ${escapeHtml(it.namaPembeli)} · ${pembelianTanggalDisplay(it)}</div>`;
-    return `
-    <div class="dist-item${draft ? ' dist-item-draft' : ''}">
-      <div class="left">
-        <b>${escapeHtml(it.namaBarang)}</b>
-        ${infoToko}
-        ${it.catatan ? `<div class="meta">Catatan: ${escapeHtml(it.catatan)}</div>` : ''}
-        ${it.createdBy ? `<div class="meta">Diinput oleh ${escapeHtml(it.createdBy)}</div>` : ''}
-        ${linkedPo ? `<div class="meta">🔗 Untuk PO: ${escapeHtml(linkedPo.tujuanSppg)} (${formatDate(linkedPo.tanggalPo)})</div>` : ''}
-      </div>
-      <div class="right">
-        <div class="qty">${it.jumlah} ${escapeHtml(it.satuan)}</div>
-        <div class="dist-item-total">${formatRupiah(it.harga)}</div>
-        <div class="dist-item-actions">
-          ${draft ? `<button class="btn lengkapi-btn" data-editid="${it.id}" title="Isi toko &amp; harga beli">Lengkapi</button>` : ''}
-          <button class="edit-btn" data-editid="${it.id}" title="Edit catatan ini">✏️</button>
-          <button class="del-btn" data-delid="${it.id}" title="Hapus catatan ini">🗑</button>
-        </div>
-      </div>
-    </div>
-  `;
-  }).join('');
+  logEl.innerHTML = groupPembelianItems(items).join('');
 
   logEl.querySelectorAll('button.del-btn').forEach(btn => {
     btn.addEventListener('click', () => deletePembelian(btn.dataset.delid));
@@ -313,6 +446,15 @@ export function renderPembelian() {
       const item = state.lastPembelianItems.find(it => it.id === btn.dataset.editid);
       if (item) startEditPembelian(item);
     });
+  });
+  logEl.querySelectorAll('[data-lengkapisemua]').forEach(btn => {
+    btn.addEventListener('click', () => { lengkapiExpandPoId = btn.dataset.lengkapisemua; renderPembelian(); });
+  });
+  logEl.querySelectorAll('[data-lengkapicancel]').forEach(btn => {
+    btn.addEventListener('click', () => { lengkapiExpandPoId = null; renderPembelian(); });
+  });
+  logEl.querySelectorAll('[data-lengkapisave]').forEach(btn => {
+    btn.addEventListener('click', () => simpanLengkapiSemua(btn.dataset.lengkapisave));
   });
 }
 

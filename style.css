@@ -384,6 +384,9 @@ select, input, button, textarea{
 .nota-detail-nama{font-weight:600;}
 .nota-detail-qty{color:var(--muted);}
 .nota-detail-harga{text-align:right;color:var(--blue-dark);font-weight:700;}
+.nota-detail-toko{color:var(--muted);font-weight:400;font-size:11px;}
+.nota-detail-row--pembelian{grid-template-columns:1.8fr 0.8fr 1fr auto;align-items:center;}
+.nota-detail-actions{display:flex;gap:4px;}
 
 /* PO dari SPPG: kartu dengan status & aksi bertahap */
 .po-list{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
