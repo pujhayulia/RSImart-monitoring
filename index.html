@@ -187,6 +187,7 @@
         <a href="#/koperasi/masterbarang" class="sidebar-link" data-module="koperasi" data-page="masterbarang"><span class="sidebar-link-icon">📦</span>Master Barang</a>
         <a href="#/koperasi/supplier" class="sidebar-link" data-module="koperasi" data-page="supplier"><span class="sidebar-link-icon">🏪</span>Data Supplier</a>
         <a href="#/koperasi/stokbarang" class="sidebar-link" data-module="koperasi" data-page="stokbarang"><span class="sidebar-link-icon">🗃️</span>Stok Barang</a>
+        <a href="#/koperasi/va" class="sidebar-link" data-module="koperasi" data-page="va"><span class="sidebar-link-icon">🔒</span>Update VA</a>
       </nav>
 
       <nav class="sidebar-nav-shared" aria-label="Navigasi bersama">
@@ -1254,6 +1255,75 @@
           </div>
         </section>
 
+        <!-- UPDATE VA -->
+        <section class="page" data-module="koperasi" data-page="va" id="page-koperasi-va">
+          <div class="section-head">
+            <div class="eyebrow">Database Koperasi</div>
+            <h2>🔒 Update VA</h2>
+            <p>Saldo akhir Virtual Account tiap bank — data rahasia, akses dibatasi.</p>
+          </div>
+
+          <div id="vaLockScreen" class="va-lock-screen">
+            <div class="va-lock-box">
+              <div class="va-lock-icon">🔒</div>
+              <b>Halaman ini dikunci</b>
+              <p>Masukkan password untuk melihat data saldo VA.</p>
+              <input type="password" id="vaPasswordInput" placeholder="Password">
+              <div class="va-lock-error hidden" id="vaLockError">Password salah, coba lagi.</div>
+              <button type="button" class="btn btn--block" id="btnVaUnlock">Buka</button>
+            </div>
+          </div>
+
+          <div id="vaContent" class="hidden">
+            <div class="rekap-top">
+              <div>
+                <label class="inline-label" for="vaDateSelect">Tanggal:</label>
+                <select id="vaDateSelect"></select>
+              </div>
+              <button type="button" class="btn" id="btnToggleVaForm">+ Update Saldo VA</button>
+            </div>
+
+            <div id="vaBox" class="va-bank-grid"></div>
+            <div id="vaMeta" class="meta"></div>
+
+            <div class="totals-row" style="grid-template-columns:1fr;">
+              <div class="total-card alt">
+                <div class="lbl">Total Saldo VA (6 Bank)</div>
+                <div class="val" id="vaTotal">–</div>
+              </div>
+            </div>
+
+            <div class="section-head section-head--sub">
+              <h3>Laporan Riwayat Saldo VA</h3>
+              <p>Unduh seluruh riwayat update saldo VA dalam rentang tanggal tertentu.</p>
+            </div>
+            <div class="date-filter-row">
+              <input type="date" id="vaFilterDari" aria-label="Dari tanggal">
+              <span class="date-filter-sep">–</span>
+              <input type="date" id="vaFilterSampai" aria-label="Sampai tanggal">
+              <button type="button" class="btn-ghost" id="btnDownloadVa">⬇ Download Laporan (CSV)</button>
+            </div>
+
+            <div class="form-panel" id="vaFormPanel">
+              <b class="form-panel-title">Update Saldo VA</b>
+              <div class="form-grid">
+                <div class="form-field"><label for="newVaDate">Tanggal</label><input type="date" id="newVaDate"></div>
+                <div class="form-field"><label for="vaInput_bsi">Saldo Akhir VA BSI</label><input type="number" id="vaInput_bsi" placeholder="-"></div>
+                <div class="form-field"><label for="vaInput_mandiri">Saldo Akhir VA Mandiri</label><input type="number" id="vaInput_mandiri" placeholder="-"></div>
+                <div class="form-field"><label for="vaInput_bri">Saldo Akhir VA BRI</label><input type="number" id="vaInput_bri" placeholder="-"></div>
+                <div class="form-field"><label for="vaInput_bca">Saldo Akhir VA BCA</label><input type="number" id="vaInput_bca" placeholder="-"></div>
+                <div class="form-field"><label for="vaInput_btn">Saldo Akhir VA BTN</label><input type="number" id="vaInput_btn" placeholder="-"></div>
+                <div class="form-field"><label for="vaInput_bni">Saldo Akhir VA BNI</label><input type="number" id="vaInput_bni" placeholder="-"></div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn" id="btnSaveVa">Simpan Saldo VA</button>
+                <button type="button" class="btn-ghost" id="btnCancelVa">Batal</button>
+              </div>
+              <div class="hint">Menyimpan tanggal yang sudah ada akan menimpa data lama untuk tanggal itu.</div>
+            </div>
+          </div>
+        </section>
+
         <!-- ===== BERSAMA (bisa diakses dari modul mana pun) ===== -->
 
         <!-- RIWAYAT AKTIVITAS -->
@@ -1293,6 +1363,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=62"></script>
+<script type="module" src="js/main.js?v=63"></script>
 </body>
 </html>

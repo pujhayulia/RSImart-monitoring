@@ -201,6 +201,21 @@ body{
   padding:2px 6px;border-radius:8px;vertical-align:middle;
 }
 .no-data--inline{padding:0;}
+
+/* UPDATE VA */
+.va-lock-screen{display:flex;justify-content:center;padding:40px 16px;}
+.va-lock-box{
+  max-width:340px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:28px 24px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;
+}
+.va-lock-icon{font-size:34px;}
+.va-lock-box p{margin:0;font-size:12.5px;color:var(--muted);}
+.va-lock-box input{width:100%;text-align:center;margin-top:6px;}
+.va-lock-error{color:#B5432E;font-size:12px;font-weight:600;}
+.va-bank-grid{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+.va-bank-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+.va-bank-label{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:0.4px;text-transform:uppercase;}
+.va-bank-val{font-size:16px;font-weight:800;color:var(--blue-dark);margin-top:4px;}
 select, input, button, textarea{
   font-family:inherit;font-size:13px;border-radius:8px;border:1px solid var(--line);
   padding:9px 12px;background:#fff;color:var(--ink);

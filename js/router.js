@@ -27,6 +27,7 @@ export const MODULES = {
       masterbarang: 'Master Barang',
       supplier: 'Data Supplier',
       stokbarang: 'Stok Barang',
+      va: 'Update VA',
     },
   },
 };

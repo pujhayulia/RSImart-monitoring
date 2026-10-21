@@ -26,6 +26,8 @@ export const state = {
   lastBiayaOperasionalItems: [],
   masterBarangUnsub: null,
   lastMasterBarangItems: [],
+  vaUnsub: null,
+  lastVaHistory: [],
   supplierUnsub: null,
   lastSupplierItems: [],
   stokBarangUnsub: null,

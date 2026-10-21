@@ -33,6 +33,7 @@ import { initBuktiBayarEvents } from './ui-bukti-bayar.js';
 import { watchMasterBarang, initMasterBarangEvents } from './ui-master-barang.js';
 import { watchSupplier, initSupplierEvents } from './ui-supplier-koperasi.js';
 import { watchStokBarang, initStokBarangEvents } from './ui-stok-barang-koperasi.js';
+import { watchVaDates, initVaEvents } from './ui-va-balances.js';
 
 const configLooksEmpty = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('GANTI_DENGAN');
 
@@ -96,6 +97,7 @@ function initEvents() {
   initMasterBarangEvents();
   initSupplierEvents();
   initStokBarangEvents();
+  initVaEvents();
 }
 
 function onGudangChange() {
@@ -137,6 +139,7 @@ async function startAppData() {
     watchMasterBarang(onKoperasiDataChange);
     watchSupplier(onKoperasiDataChange);
     watchStokBarang(onKoperasiDataChange);
+    watchVaDates();
     watchPembelian(onKoperasiDataChange);
     watchDistribusiSppg(onKoperasiDataChange);
     watchActivityLog();

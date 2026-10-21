@@ -142,6 +142,9 @@ sembarang orang dari luar situs Anda.
          allow read: if true;
          allow write: if request.auth != null;
        }
+       match /vaBalances/{id} {
+         allow read, write: if request.auth != null && request.auth.token.email == 'rsehatindonesia@gmail.com';
+       }
      }
    }
    ```
@@ -154,6 +157,14 @@ sembarang orang dari luar situs Anda.
 > butuh kontrol lebih ketat lagi (misalnya hanya email tertentu yang boleh
 > mengisi), Firestore Rules bisa dipersempit lebih lanjut — tinggal beri tahu
 > saya kalau mau ditingkatkan.
+>
+> **Kekecualian: `vaBalances`** (saldo VA, halaman "Update VA" di Koperasi) sengaja
+> **tidak** memakai pola "siapa saja bisa baca" di atas — koleksi ini hanya bisa
+> dibaca/ditulis oleh akun dengan email persis `rsehatindonesia@gmail.com`. Staf
+> lain yang sudah login ke situs tetap akan ditolak Firestore kalau mencoba buka
+> data ini, walau tahu password kunci halamannya. Kalau suatu saat perlu menambah
+> akun lain yang boleh akses, ganti baris itu jadi
+> `request.auth.token.email in ['email1@...', 'email2@...']`.
 
 ## Langkah 4b — Aktifkan Firebase Storage (untuk bukti bayar)
 
