@@ -7,6 +7,8 @@
 <meta name="description" content="Katalog produk ARSI, stok Gudang RSI, distribusi pengiriman, koperasi bahan makanan (pembelian & distribusi ke SPPG), dan rekap keuangan otomatis untuk Yayasan Rumah Sehat Indonesia.">
 <meta name="format-detection" content="telephone=no">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHRleHQgeT0iMjAiIGZvbnQtc2l6ZT0iMjAiPvCfkqc8L3RleHQ+PC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="style.css">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -20,35 +22,48 @@
 <div class="auth-overlay" id="authOverlay">
   <div class="auth-shell">
     <div class="auth-brand-panel">
-      <div class="brand-row">
-        <div class="brand-chip chip-green">RSI</div>
-        <div class="brand-chip chip-teal">💧</div>
+      <div class="auth-brand-decor" aria-hidden="true"></div>
+      <div class="auth-brand-inner">
+        <div class="brand-row auth-brand-logos">
+          <div class="brand-chip chip-green">RSI</div>
+          <div class="brand-chip chip-teal">💧</div>
+        </div>
+        <h1 class="auth-brand-title">Yayasan Rumah<br>Sehat Indonesia</h1>
+        <p class="auth-brand-tagline">Satu tempat untuk katalog produk, stok Gudang RSI, distribusi pengiriman, koperasi bahan makanan, dan rekap keuangan — tersinkron real-time untuk seluruh tim.</p>
+        <ul class="auth-brand-points">
+          <li><span class="auth-point-icon">⚡</span>Data tersinkron real-time ke semua perangkat</li>
+          <li><span class="auth-point-icon">💰</span>Rekap keuangan otomatis dari tiap pengiriman</li>
+          <li><span class="auth-point-icon">📋</span>Pembelian &amp; distribusi koperasi tercatat rapi per item</li>
+        </ul>
       </div>
-      <h1 class="auth-brand-title">Yayasan Rumah Sehat Indonesia</h1>
-      <p class="auth-brand-tagline">Satu tempat untuk katalog produk, stok Gudang RSI, distribusi pengiriman, koperasi bahan makanan, dan rekap keuangan — tersinkron real-time untuk seluruh tim.</p>
-      <ul class="auth-brand-points">
-        <li>Data tersinkron real-time ke semua perangkat</li>
-        <li>Rekap keuangan otomatis dari tiap pengiriman</li>
-        <li>Pembelian &amp; distribusi koperasi tercatat rapi per item</li>
-      </ul>
     </div>
     <div class="auth-form-panel">
       <div class="auth-card">
+        <div class="auth-card-icon">🔐</div>
         <h2 id="authTitle">Masuk ke akun Anda</h2>
         <p id="authSubtitle">Masuk untuk melihat dan mengisi data stok, distribusi, dan keuangan.</p>
 
         <form id="authForm">
           <div class="auth-field">
             <label for="authEmail">Email</label>
-            <input type="email" id="authEmail" required autocomplete="email">
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon">✉️</span>
+              <input type="email" id="authEmail" required autocomplete="email" placeholder="nama@email.com">
+            </div>
           </div>
           <div class="auth-field">
             <label for="authPassword">Kata Sandi</label>
-            <input type="password" id="authPassword" required minlength="6" autocomplete="current-password">
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon">🔒</span>
+              <input type="password" id="authPassword" required minlength="6" autocomplete="current-password" placeholder="••••••••">
+            </div>
           </div>
           <div class="auth-field hidden" id="authConfirmWrap">
             <label for="authPasswordConfirm">Ulangi Kata Sandi</label>
-            <input type="password" id="authPasswordConfirm" minlength="6" autocomplete="new-password">
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon">🔒</span>
+              <input type="password" id="authPasswordConfirm" minlength="6" autocomplete="new-password" placeholder="••••••••">
+            </div>
           </div>
           <div class="auth-error hidden" id="authError"></div>
           <button type="submit" class="btn btn--block" id="authSubmitBtn">Masuk</button>
@@ -1424,6 +1439,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=64"></script>
+<script type="module" src="js/main.js?v=65"></script>
 </body>
 </html>
