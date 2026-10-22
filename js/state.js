@@ -15,6 +15,8 @@ export const state = {
   lokasiSet: new Set(),
   lokasiNames: [], // sama isinya dengan lokasiSet tapi kapitalisasi asli dipertahankan (mis. "Dapur Nambo") — dipakai saat butuh nama lokasi yang bisa ditampilkan, bukan cuma dicocokkan
   lastDistItems: [],
+  sedekahUnsub: null,
+  lastSedekahItems: [],
   pembelianUnsub: null,
   lastPembelianItems: [],
   distribusiSppgUnsub: null,

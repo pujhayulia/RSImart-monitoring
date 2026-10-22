@@ -174,6 +174,7 @@
         <a href="#/rsi/katalog" class="sidebar-link" data-module="rsi" data-page="katalog"><span class="sidebar-link-icon">📦</span>Katalog Produk</a>
         <a href="#/rsi/gudang" class="sidebar-link" data-module="rsi" data-page="gudang"><span class="sidebar-link-icon">🏬</span>Stok Gudang RSI</a>
         <a href="#/rsi/distribusi" class="sidebar-link" data-module="rsi" data-page="distribusi"><span class="sidebar-link-icon">🚚</span>Distribusi</a>
+        <a href="#/rsi/sedekah" class="sidebar-link" data-module="rsi" data-page="sedekah"><span class="sidebar-link-icon">🤲</span>Bersedekah</a>
         <a href="#/rsi/keuangan" class="sidebar-link" data-module="rsi" data-page="keuangan"><span class="sidebar-link-icon">💰</span>Keuangan</a>
       </nav>
 
@@ -443,6 +444,66 @@
                 <select id="distFilterProduk" aria-label="Filter produk pada log pengiriman"></select>
               </div>
               <div class="dist-log" id="distLog"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- BERSEDEKAH -->
+        <section class="page" data-module="rsi" data-page="sedekah" id="page-rsi-sedekah">
+          <div class="section-head">
+            <div class="eyebrow">Pengiriman Tanpa Biaya</div>
+            <h2>🤲 Bersedekah</h2>
+            <p>Catat pengiriman produk yang disumbangkan (tidak ditagih) — tetap butuh data pengiriman lengkap, tapi tidak masuk Rekap Keuangan sebagai pemasukan.</p>
+          </div>
+          <div class="totals-row koperasi-totals" style="grid-template-columns:repeat(2,1fr);">
+            <div class="total-card">
+              <div class="lbl">Jumlah Catatan Sedekah</div>
+              <div class="val" id="sedekahTotalCatatan">–</div>
+            </div>
+            <div class="total-card alt">
+              <div class="lbl">Estimasi Nilai Sedekah</div>
+              <div class="val" id="sedekahTotalEstimasi">–</div>
+            </div>
+          </div>
+          <div class="dist-grid">
+            <div class="dist-form">
+              <h3>Catat Sedekah Baru</h3>
+              <p class="tip">Pilih lokasi yang sudah ada, atau ketik tujuan/penerima baru — otomatis tersimpan.</p>
+              <div class="dist-field">
+                <label for="sedekahTanggalKirim">Tanggal Kirim</label>
+                <input type="date" id="sedekahTanggalKirim">
+              </div>
+              <div class="dist-field">
+                <label for="sedekahTujuan">Tujuan / Penerima</label>
+                <input list="lokasiList" id="sedekahTujuan" placeholder="Contoh: Panti Asuhan X / lokasi baru...">
+              </div>
+              <div class="dist-field">
+                <label for="sedekahProduk">Produk</label>
+                <select id="sedekahProduk"></select>
+              </div>
+              <div class="dist-field">
+                <label for="sedekahJumlah">Jumlah Terkirim</label>
+                <div class="dist-jumlah-row">
+                  <input type="number" id="sedekahJumlah" placeholder="0">
+                  <span id="sedekahSatuan" class="dist-satuan">galon</span>
+                </div>
+              </div>
+              <div class="dist-field">
+                <label for="sedekahKeterangan">Keterangan (opsional)</label>
+                <textarea id="sedekahKeterangan" rows="2" placeholder="Mis. nama pengantar, alasan sedekah, catatan tambahan"></textarea>
+              </div>
+              <div class="estimasi-box">
+                <div class="estimasi-row total"><span>Estimasi nilai (referensi, bukan tagihan)</span><b id="sedekahEstimasi">—</b></div>
+              </div>
+              <button type="button" class="btn btn--block" id="btnSaveSedekah">Simpan Sedekah</button>
+              <button type="button" class="btn-ghost btn--block hidden" id="btnCancelEditSedekah">Batal Edit</button>
+              <div class="shared-note">Data ini tersimpan bersama secara real-time. Tidak dihitung sebagai pemasukan di Rekap Keuangan — khusus untuk pencatatan donasi.</div>
+            </div>
+            <div>
+              <div class="dist-filter-row">
+                <select id="sedekahFilterProduk" aria-label="Filter produk pada log sedekah"></select>
+              </div>
+              <div class="dist-log" id="sedekahLog"></div>
             </div>
           </div>
         </section>
@@ -1363,6 +1424,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=63"></script>
+<script type="module" src="js/main.js?v=64"></script>
 </body>
 </html>

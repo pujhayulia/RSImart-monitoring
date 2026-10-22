@@ -12,6 +12,7 @@ export const MODULES = {
       katalog: 'Katalog Produk',
       gudang: 'Stok Gudang RSI',
       distribusi: 'Distribusi & Pengiriman',
+      sedekah: 'Bersedekah',
       keuangan: 'Rekap Keuangan',
     },
   },

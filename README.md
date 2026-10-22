@@ -102,6 +102,10 @@ sembarang orang dari luar situs Anda.
          allow read: if true;
          allow write: if request.auth != null;
        }
+       match /sedekah/{id} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
        match /lokasi/{id} {
          allow read: if true;
          allow write: if request.auth != null;

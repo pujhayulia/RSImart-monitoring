@@ -17,6 +17,7 @@ import {
 import { ensureSeedLokasi, watchLokasi } from './ui-lokasi.js';
 import { initProdukSelects, watchDistribusi, saveDistribusi, renderDistLog, updateHargaUI } from './ui-distribusi.js';
 import { initImportDistribusiEvents } from './ui-import-distribusi.js';
+import { initSedekahProdukSelect, watchSedekah, initSedekahEvents } from './ui-sedekah.js';
 import { renderKeuangan, initKeuanganReportEvents } from './ui-keuangan.js';
 import { renderBeranda } from './ui-beranda.js';
 import { watchPembelian, initPembelianEvents, refreshPoOptions, renderPembelian } from './ui-pembelian.js';
@@ -134,6 +135,7 @@ async function startAppData() {
     watchLokasi();
     watchProdukHarga(onProdukHargaChange);
     watchDistribusi(onDistribusiChange);
+    watchSedekah();
     watchPoSppg(onKoperasiDataChange);
     watchBiayaOperasional(onKoperasiDataChange);
     watchMasterBarang(onKoperasiDataChange);
@@ -154,6 +156,8 @@ async function init() {
   renderProdukGrid();
   initKatalogEvents();
   initProdukSelects();
+  initSedekahProdukSelect();
+  initSedekahEvents();
   initEvents();
   initRouter((module, page) => {
     if (module === 'rsi' && page === 'beranda') renderBeranda();
@@ -166,6 +170,7 @@ async function init() {
   });
   document.getElementById('distTanggalPesan').value = todayIso();
   document.getElementById('distTanggalKirim').value = todayIso();
+  document.getElementById('sedekahTanggalKirim').value = todayIso();
   document.getElementById('sppgTanggalKirim').value = todayIso();
   document.getElementById('poTanggal').value = todayIso();
   document.getElementById('biayaOpTanggal').value = todayIso();
