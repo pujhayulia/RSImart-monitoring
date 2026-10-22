@@ -1,7 +1,9 @@
 :root{
   --blue:#1668B0;
   --blue-dark:#0F4C82;
-  --green:#2F8F4E;
+  --orange:#DE7A1E;     /* warna utama tombol/aksi -- diambil dari logo Yayasan */
+  --orange-dark:#B85F10;
+  --green:#2E8B3A;      /* disesuaikan mendekati hijau logo (sebelumnya #2F8F4E) */
   --teal:#16A398;
   --amber:#E0A430;
   --grey-empty:#9FB1BE;
@@ -224,10 +226,10 @@ select:focus, input:focus, textarea:focus{
   outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,104,176,0.14);
 }
 .btn{
-  background:var(--blue);color:#fff;border:none;font-weight:700;cursor:pointer;
+  background:var(--orange);color:#fff;border:none;font-weight:700;cursor:pointer;
   padding:10px 16px;
 }
-.btn:hover{background:var(--blue-dark);}
+.btn:hover{background:var(--orange-dark);}
 .btn:disabled{opacity:.5;cursor:not-allowed;}
 .btn--block{width:100%;}
 .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink);font-weight:600;cursor:pointer;}
@@ -582,7 +584,7 @@ footer{margin-top:56px;text-align:center;font-size:11.5px;color:var(--muted);}
   background:#FDECEC;border:1px solid #F3B9B9;color:#8A2222;
   border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:14px;
 }
-#authSubmitBtn{padding:11px 16px;font-size:14px;border-radius:9px;box-shadow:0 10px 24px rgba(22,104,176,0.25);}
+#authSubmitBtn{padding:11px 16px;font-size:14px;border-radius:9px;box-shadow:0 10px 24px rgba(222,122,30,0.3);}
 .auth-switch{margin-top:18px;text-align:center;font-size:13px;color:var(--muted);}
 .auth-switch a{color:var(--blue);font-weight:700;text-decoration:none;margin-left:4px;}
 .auth-switch a:hover{text-decoration:underline;}
