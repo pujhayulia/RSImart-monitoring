@@ -233,12 +233,23 @@ function belumLengkap(it) {
   return !it.namaToko;
 }
 
+/** true kalau catatan ini berasal dari arsip impor massal (langsung ditandai importBatch, ATAU
+ * backfill draft dari PO lama yang PO-nya sendiri bertanda arsip) -- bukan diinput manual hari-hari
+ * biasa. Dipakai supaya data baru tidak "tertimbun" ribuan catatan arsip secara default. */
+function pembelianIsArsip(it) {
+  if (it.importBatch) return true;
+  const po = it.poId ? (state.lastPoSppgItems || []).find(p => p.id === it.poId) : null;
+  return !!(po && po.importBatch);
+}
+
 function filteredPembelian() {
+  const tampilkanArsip = document.getElementById('pembelianFilterArsip').checked;
   const dari = document.getElementById('pembelianFilterDari').value;
   const sampai = document.getElementById('pembelianFilterSampai').value;
   const dapur = document.getElementById('pembelianFilterDapur').value.trim().toLowerCase();
   const hanyaBelumLengkap = document.getElementById('pembelianFilterBelumLengkap').checked;
   return state.lastPembelianItems.filter(it => {
+    if (!tampilkanArsip && pembelianIsArsip(it)) return false;
     if (hanyaBelumLengkap) return belumLengkap(it); // abaikan filter tanggal — jangan sampai ada draft lama yang tersembunyi
     if ((dari || sampai) && !isDateStrInRange(pembelianTanggalIso(it), dari, sampai)) return false;
     if (dapur && !dapurUntukPembelian(it).toLowerCase().includes(dapur)) return false;
@@ -458,6 +469,10 @@ export function renderPembelian() {
   const belumLengkapEl = document.getElementById('pembelianBelumLengkap');
   if (belumLengkapEl) belumLengkapEl.textContent = String(state.lastPembelianItems.filter(belumLengkap).length);
 
+  const arsipCount = state.lastPembelianItems.filter(pembelianIsArsip).length;
+  const arsipLabelEl = document.getElementById('pembelianFilterArsipLabel');
+  if (arsipLabelEl) arsipLabelEl.textContent = `📁 Tampilkan Arsip (${arsipCount})`;
+
   if (items.length === 0) {
     logEl.innerHTML = `<div class="empty-state">Belum ada catatan pembelian untuk filter ini.</div>`;
     return;
@@ -654,6 +669,7 @@ export function initPembelianEvents() {
   document.getElementById('pembelianFilterSampai').addEventListener('change', renderPembelian);
   document.getElementById('pembelianFilterDapur').addEventListener('input', renderPembelian);
   document.getElementById('pembelianFilterBelumLengkap').addEventListener('change', renderPembelian);
+  document.getElementById('pembelianFilterArsip').addEventListener('change', renderPembelian);
   document.getElementById('pembelianBelumLengkap').closest('.total-card').addEventListener('click', () => {
     const cb = document.getElementById('pembelianFilterBelumLengkap');
     cb.checked = !cb.checked;
@@ -664,6 +680,7 @@ export function initPembelianEvents() {
     document.getElementById('pembelianFilterSampai').value = '';
     document.getElementById('pembelianFilterDapur').value = '';
     document.getElementById('pembelianFilterBelumLengkap').checked = false;
+    document.getElementById('pembelianFilterArsip').checked = false;
     renderPembelian();
   });
   document.getElementById('btnDownloadPembelian').addEventListener('click', downloadLaporanPembelian);

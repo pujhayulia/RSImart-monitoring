@@ -784,12 +784,20 @@ export function watchPoSppg(onChange) {
   });
 }
 
+/** true kalau PO ini berasal dari arsip impor massal (April-Agustus / Sept-Okt), bukan diinput manual
+ * hari-hari biasa -- dipakai supaya data baru tidak "tertimbun" ribuan catatan arsip secara default. */
+export function poIsArsip(po) {
+  return !!po.importBatch;
+}
+
 function filteredPo() {
   const dari = document.getElementById('poFilterDari').value;
   const sampai = document.getElementById('poFilterSampai').value;
   const status = document.getElementById('poFilterStatus').value;
   const dapur = document.getElementById('poFilterDapur').value.trim().toLowerCase();
+  const tampilkanArsip = document.getElementById('poFilterArsip').checked;
   return state.lastPoSppgItems.filter(po => {
+    if (!tampilkanArsip && poIsArsip(po)) return false;
     if (status !== 'all' && po.status !== status) return false;
     if ((dari || sampai) && !isDateStrInRange(po.tanggalPo, dari, sampai)) return false;
     if (dapur && !(po.tujuanSppg || '').toLowerCase().includes(dapur)) return false;
@@ -827,6 +835,10 @@ export function renderPoSppg() {
   const aktifEl = document.getElementById('poAktifCount');
   if (menungguEl) menungguEl.textContent = String(menungguTindakan);
   if (aktifEl) aktifEl.textContent = String(aktif);
+
+  const arsipCount = state.lastPoSppgItems.filter(poIsArsip).length;
+  const arsipLabelEl = document.getElementById('poFilterArsipLabel');
+  if (arsipLabelEl) arsipLabelEl.textContent = `📁 Tampilkan Arsip (${arsipCount})`;
 
   const importBar = document.getElementById('poImportBar');
   if (importBar) {
@@ -1912,11 +1924,13 @@ export function initPoSppgEvents() {
     document.getElementById(id).addEventListener('change', renderPoSppg);
   });
   document.getElementById('poFilterDapur').addEventListener('input', renderPoSppg);
+  document.getElementById('poFilterArsip').addEventListener('change', renderPoSppg);
   document.getElementById('btnPoFilterReset').addEventListener('click', () => {
     document.getElementById('poFilterStatus').value = 'all';
     document.getElementById('poFilterDari').value = '';
     document.getElementById('poFilterSampai').value = '';
     document.getElementById('poFilterDapur').value = '';
+    document.getElementById('poFilterArsip').checked = false;
     renderPoSppg();
   });
   document.getElementById('btnDownloadPo').addEventListener('click', downloadLaporanPo);

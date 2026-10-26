@@ -783,6 +783,7 @@
                 <input type="date" id="poFilterDari" aria-label="Dari tanggal">
                 <input type="date" id="poFilterSampai" aria-label="Sampai tanggal">
                 <input type="text" id="poFilterDapur" placeholder="Cari nama dapur/SPPG..." aria-label="Cari dapur">
+                <label class="filter-checkbox"><input type="checkbox" id="poFilterArsip"><span id="poFilterArsipLabel">📁 Tampilkan Arsip</span></label>
                 <button type="button" class="filter-reset" id="btnPoFilterReset">Reset</button>
                 <button type="button" class="btn-ghost download-btn" id="btnDownloadPo">⬇ Download (CSV)</button>
               </div>
@@ -862,6 +863,7 @@
                 <input type="date" id="pembelianFilterSampai" aria-label="Sampai tanggal">
                 <input type="text" id="pembelianFilterDapur" placeholder="Cari nama dapur/SPPG (dari PO terkait)..." aria-label="Cari dapur">
                 <label class="filter-checkbox"><input type="checkbox" id="pembelianFilterBelumLengkap"> Hanya yang perlu dilengkapi</label>
+                <label class="filter-checkbox"><input type="checkbox" id="pembelianFilterArsip"><span id="pembelianFilterArsipLabel">📁 Tampilkan Arsip</span></label>
                 <button type="button" class="filter-reset" id="btnPembelianFilterReset">Reset</button>
                 <button type="button" class="btn-ghost download-btn" id="btnDownloadPembelian">⬇ Download (CSV)</button>
               </div>
@@ -994,6 +996,7 @@
                 <input type="date" id="biayaOpFilterDari" aria-label="Dari tanggal">
                 <span class="date-filter-sep">–</span>
                 <input type="date" id="biayaOpFilterSampai" aria-label="Sampai tanggal">
+                <label class="filter-checkbox"><input type="checkbox" id="biayaOpFilterArsip"><span id="biayaOpFilterArsipLabel">📁 Tampilkan Arsip</span></label>
                 <button type="button" class="filter-reset" id="btnBiayaOpFilterReset">Reset</button>
                 <button type="button" class="btn-ghost download-btn" id="btnDownloadBiayaOp">⬇ Download (CSV)</button>
               </div>
@@ -1438,6 +1441,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=68"></script>
+<script type="module" src="js/main.js?v=69"></script>
 </body>
 </html>

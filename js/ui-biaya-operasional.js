@@ -36,10 +36,17 @@ export function biayaOperasionalInRange(dari, sampai) {
   return state.lastBiayaOperasionalItems.filter(it => isDateStrInRange(it.tanggal, dari, sampai));
 }
 
+/** true kalau catatan ini berasal dari arsip impor massal (importBatch) -- bukan diinput manual
+ * hari-hari biasa. Dipakai supaya data baru tidak "tertimbun" ribuan catatan arsip secara default. */
+function biayaOperasionalIsArsip(it) {
+  return !!it.importBatch;
+}
+
 function filteredBiayaOperasional() {
   const dari = document.getElementById('biayaOpFilterDari').value;
   const sampai = document.getElementById('biayaOpFilterSampai').value;
-  return biayaOperasionalInRange(dari, sampai);
+  const tampilkanArsip = document.getElementById('biayaOpFilterArsip').checked;
+  return biayaOperasionalInRange(dari, sampai).filter(it => tampilkanArsip || !biayaOperasionalIsArsip(it));
 }
 
 export function renderBiayaOperasional() {
@@ -52,6 +59,10 @@ export function renderBiayaOperasional() {
   const totalTransaksiEl = document.getElementById('biayaOpTotalTransaksi');
   if (totalEl) totalEl.textContent = formatRupiah(total);
   if (totalTransaksiEl) totalTransaksiEl.textContent = String(items.length);
+
+  const arsipCount = state.lastBiayaOperasionalItems.filter(biayaOperasionalIsArsip).length;
+  const arsipLabelEl = document.getElementById('biayaOpFilterArsipLabel');
+  if (arsipLabelEl) arsipLabelEl.textContent = `📁 Tampilkan Arsip (${arsipCount})`;
 
   if (items.length === 0) {
     logEl.innerHTML = `<div class="empty-state">Belum ada catatan biaya operasional untuk rentang tanggal ini.</div>`;
@@ -212,9 +223,11 @@ export function initBiayaOperasionalEvents() {
   document.getElementById('biayaOpFilterSampai').value = sampai;
   document.getElementById('biayaOpFilterDari').addEventListener('change', renderBiayaOperasional);
   document.getElementById('biayaOpFilterSampai').addEventListener('change', renderBiayaOperasional);
+  document.getElementById('biayaOpFilterArsip').addEventListener('change', renderBiayaOperasional);
   document.getElementById('btnBiayaOpFilterReset').addEventListener('click', () => {
     document.getElementById('biayaOpFilterDari').value = '';
     document.getElementById('biayaOpFilterSampai').value = '';
+    document.getElementById('biayaOpFilterArsip').checked = false;
     renderBiayaOperasional();
   });
   document.getElementById('btnDownloadBiayaOp').addEventListener('click', downloadLaporanBiayaOperasional);
