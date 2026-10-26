@@ -17,7 +17,7 @@ let editingId = null;
 export function watchBiayaOperasional(onChange) {
   const logEl = document.getElementById('biayaOpLog');
   logEl.innerHTML = `<div class="empty-state">Memuat data biaya operasional...</div>`;
-  const q = query(collection(state.db, 'biayaOperasional'), orderBy('createdAt', 'desc'), limit(500));
+  const q = query(collection(state.db, 'biayaOperasional'), orderBy('createdAt', 'desc'), limit(3000));
   if (state.biayaOperasionalUnsub) state.biayaOperasionalUnsub();
   state.biayaOperasionalUnsub = onSnapshot(q, (qs) => {
     state.lastBiayaOperasionalItems = [];

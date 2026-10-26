@@ -771,7 +771,7 @@ function readItemRows() {
 export function watchPoSppg(onChange) {
   const logEl = document.getElementById('poSppgLog');
   logEl.innerHTML = `<div class="empty-state">Memuat data PO...</div>`;
-  const q = query(collection(state.db, 'poSppg'), orderBy('createdAt', 'desc'), limit(300));
+  const q = query(collection(state.db, 'poSppg'), orderBy('createdAt', 'desc'), limit(3000));
   if (state.poSppgUnsub) state.poSppgUnsub();
   state.poSppgUnsub = onSnapshot(q, (qs) => {
     state.lastPoSppgItems = [];
@@ -1219,6 +1219,12 @@ function pembelianUntukPoItem(poId, itemId) {
  * menambahkan draft ke PO lama (dibuat sebelum fitur draft-otomatis ini ada). Barang yang sudah punya
  * minimal satu catatan (draft ataupun yang sudah lengkap) dilewati, supaya tidak dobel. */
 function poItemBelumPunyaPembelian() {
+  // state.lastPembelianItems dibatasi limit() di watchPembelian() -- kalau koleksinya sampai sebesar
+  // itu lagi suatu saat nanti, fungsi ini bisa salah mengira barang lama "belum ada catatannya" padahal
+  // sebenarnya ada (cuma kepotong dari cache). Peringatkan di console supaya ketahuan, bukan diam-diam salah.
+  if (state.lastPembelianItems.length >= 19500) {
+    console.warn(`state.lastPembelianItems sudah ${state.lastPembelianItems.length} dokumen, mendekati batas limit() di watchPembelian() -- poItemBelumPunyaPembelian() bisa mulai salah hitung lagi. Naikkan limit-nya.`);
+  }
   const hasil = [];
   state.lastPoSppgItems.forEach(po => {
     (po.items || []).forEach((it, idx) => {

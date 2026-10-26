@@ -184,7 +184,11 @@ function fieldEl(name) {
 export function watchPembelian(onChange) {
   const logEl = document.getElementById('pembelianLog');
   logEl.innerHTML = `<div class="empty-state">Memuat data pembelian...</div>`;
-  const q = query(collection(state.db, 'pembelianBahanMakanan'), orderBy('createdAt', 'desc'), limit(500));
+  // Limit digenerosi (sebelumnya 500) -- koleksi ini sekarang berisi ribuan draft (satu dokumen per
+  // barang PO, bukan per PO), jadi batas kecil membuat state.lastPembelianItems TIDAK lengkap dan
+  // merusak logika "sudah ada pembelian belum" (poItemBelumPunyaPembelian, itemRealisasi/margin) --
+  // item lama yang kepotong dari cache dikira belum punya catatan padahal sebenarnya sudah ada.
+  const q = query(collection(state.db, 'pembelianBahanMakanan'), orderBy('createdAt', 'desc'), limit(20000));
   if (state.pembelianUnsub) state.pembelianUnsub();
   state.pembelianUnsub = onSnapshot(q, (qs) => {
     state.lastPembelianItems = [];

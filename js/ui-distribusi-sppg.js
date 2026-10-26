@@ -142,7 +142,7 @@ function readItemRows() {
 export function watchDistribusiSppg(onChange) {
   const logEl = document.getElementById('sppgLog');
   logEl.innerHTML = `<div class="empty-state">Memuat data distribusi...</div>`;
-  const q = query(collection(state.db, 'distribusiSppg'), orderBy('createdAt', 'desc'), limit(300));
+  const q = query(collection(state.db, 'distribusiSppg'), orderBy('createdAt', 'desc'), limit(3000));
   if (state.distribusiSppgUnsub) state.distribusiSppgUnsub();
   state.distribusiSppgUnsub = onSnapshot(q, (qs) => {
     state.lastDistribusiSppgItems = [];
