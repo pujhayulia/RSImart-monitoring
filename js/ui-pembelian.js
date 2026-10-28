@@ -554,19 +554,16 @@ export async function savePembelian() {
   const values = {};
   for (const name of FIELD_IDS) values[name] = fieldEl(name).value.trim();
 
-  if (!values.NamaToko || !values.AlamatToko || !values.NamaPembeli) {
-    alert('Mohon isi nama toko, alamat toko, dan nama pembeli.');
-    return;
-  }
-
+  // Nama toko, alamat, pembeli, dan harga boleh dikosongkan -- pembelian tetap bisa disimpan sebagai
+  // "Perlu Dilengkapi" (lihat belumLengkap()) dan diedit lagi nanti saat info toko/harga sudah ada.
   const rows = readItemRows();
   if (rows.length === 0) {
-    alert('Mohon isi minimal satu barang (nama, jumlah, satuan, dan harga).');
+    alert('Mohon isi minimal satu barang (nama, jumlah, dan satuan).');
     return;
   }
-  const rowTakLengkap = rows.find(r => !r.namaBarang || !r.jumlah || !r.satuan || !r.harga);
+  const rowTakLengkap = rows.find(r => !r.namaBarang || !r.jumlah || !r.satuan);
   if (rowTakLengkap) {
-    alert(`Mohon lengkapi nama, jumlah, satuan, dan harga untuk barang "${rowTakLengkap.namaBarang || '(belum diisi)'}".`);
+    alert(`Mohon lengkapi nama, jumlah, dan satuan untuk barang "${rowTakLengkap.namaBarang || '(belum diisi)'}".`);
     return;
   }
 
@@ -587,7 +584,7 @@ export async function savePembelian() {
       const r = rows[0];
       const entry = {
         ...toko,
-        namaBarang: r.namaBarang, jumlah: Number(r.jumlah), satuan: r.satuan, harga: Number(r.harga),
+        namaBarang: r.namaBarang, jumlah: Number(r.jumlah), satuan: r.satuan, harga: r.harga ? Number(r.harga) : null,
         poId, poItemId: poId ? r.poItemId : null,
         updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
       };
@@ -595,7 +592,7 @@ export async function savePembelian() {
       logActivity({
         action: 'ubah',
         modul: 'Koperasi - Pembelian',
-        ringkasan: `Update pembelian ${entry.jumlah} ${entry.satuan} ${entry.namaBarang} dari ${entry.namaToko} (${formatRupiah(entry.harga)})`,
+        ringkasan: `Update pembelian ${entry.jumlah} ${entry.satuan} ${entry.namaBarang} dari ${entry.namaToko || '(toko belum diisi)'} (${entry.harga === null ? 'harga belum diisi' : formatRupiah(entry.harga)})`,
       });
       cancelEditPembelian();
     } else {
@@ -604,18 +601,19 @@ export async function savePembelian() {
         const ref = doc(collection(state.db, 'pembelianBahanMakanan'));
         batch.set(ref, {
           ...toko,
-          namaBarang: r.namaBarang, jumlah: Number(r.jumlah), satuan: r.satuan, harga: Number(r.harga),
+          namaBarang: r.namaBarang, jumlah: Number(r.jumlah), satuan: r.satuan, harga: r.harga ? Number(r.harga) : null,
           poId, poItemId: poId ? r.poItemId : null,
           createdAt: serverTimestamp(), createdBy: state.currentUserEmail,
         });
       });
       await batch.commit();
+      const totalHarga = rows.reduce((s, r) => s + (r.harga ? Number(r.harga) : 0), 0);
       logActivity({
         action: 'tambah',
         modul: 'Koperasi - Pembelian',
         ringkasan: rows.length === 1
-          ? `Beli ${Number(rows[0].jumlah)} ${rows[0].satuan} ${rows[0].namaBarang} dari ${toko.namaToko} (${formatRupiah(Number(rows[0].harga))})`
-          : `Beli ${rows.length} barang dari ${toko.namaToko} (${formatRupiah(rows.reduce((s, r) => s + Number(r.harga), 0))})`,
+          ? `Beli ${Number(rows[0].jumlah)} ${rows[0].satuan} ${rows[0].namaBarang} dari ${toko.namaToko || '(toko belum diisi)'} (${rows[0].harga ? formatRupiah(Number(rows[0].harga)) : 'harga belum diisi'})`
+          : `Beli ${rows.length} barang dari ${toko.namaToko || '(toko belum diisi)'} (${formatRupiah(totalHarga)})`,
       });
       for (const name of FIELD_IDS) fieldEl(name).value = '';
       document.getElementById('pembelianPoId').value = '';
