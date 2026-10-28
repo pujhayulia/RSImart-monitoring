@@ -21,10 +21,12 @@ function poItemKeyLocal(item, index) {
   return item.itemId || ('idx' + index);
 }
 
-/** Total sudah dibeli untuk satu barang PO tertentu (opsional: kecualikan satu catatan pembelian, mis. saat sedang diedit). */
+/** Total sudah dibeli untuk satu barang PO tertentu (opsional: kecualikan satu catatan pembelian, mis. saat sedang diedit).
+ * Draft kosong (belum ada toko -- lihat belumLengkap()) TIDAK dihitung sebagai "sudah dibeli", walaupun
+ * field jumlah-nya sudah terisi jumlah pesanan penuh -- itu cuma placeholder, belum benar-benar dibeli. */
 function jumlahDibeliUntukPoItem(poId, itemId, excludeId) {
   return (state.lastPembelianItems || [])
-    .filter(it => it.poId === poId && it.poItemId === itemId && it.id !== excludeId)
+    .filter(it => it.poId === poId && it.poItemId === itemId && it.id !== excludeId && it.namaToko)
     .reduce((sum, it) => sum + (typeof it.jumlah === 'number' ? it.jumlah : 0), 0);
 }
 
