@@ -242,6 +242,54 @@ function pembelianIsArsip(it) {
   return !!(po && po.importBatch);
 }
 
+/** Cari catatan Pembelian duplikat untuk barang PO yang sama (poId+poItemId sama) -- muncul akibat
+ * klik tombol "Tambahkan ke Pembelian Sekarang" berulang kali sebelum limit() query diperbaiki.
+ * Hanya kelompok yang AMAN dibersihkan yang dikembalikan: kalau ada 2+ catatan dengan toko/harga
+ * yang SUDAH diisi dalam satu kelompok, itu dianggap pembelian ganda yang sah (bukan duplikat kosong)
+ * dan dilewati -- tidak pernah ikut dihapus. */
+function cariDuplikatPembelian() {
+  const groups = new Map();
+  state.lastPembelianItems.forEach(it => {
+    if (!it.poId || !it.poItemId) return;
+    const key = it.poId + '::' + it.poItemId;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  });
+  const idsToDelete = [];
+  groups.forEach(items => {
+    if (items.length <= 1) return;
+    const terisi = items.filter(it => it.namaToko || typeof it.harga === 'number');
+    if (terisi.length >= 2) return; // ada 2+ catatan nyata berbeda -- bukan duplikat sederhana, lewati
+    const keep = terisi.length === 1 ? terisi[0] : items[0];
+    items.forEach(it => { if (it.id !== keep.id) idsToDelete.push(it.id); });
+  });
+  return idsToDelete;
+}
+
+async function bersihkanDuplikatPembelian() {
+  const idsToDelete = cariDuplikatPembelian();
+  if (idsToDelete.length === 0) return;
+  if (!confirm(`Ditemukan ${idsToDelete.length} catatan duplikat kosong untuk barang PO yang sama (sisa klik tombol backfill berulang). Hapus sekarang? Catatan yang sudah diisi toko/harga TIDAK akan dihapus.`)) return;
+
+  const btn = document.getElementById('btnBersihkanDuplikatPembelian');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menghapus...'; }
+  try {
+    for (let i = 0; i < idsToDelete.length; i += 450) {
+      const batch = writeBatch(state.db);
+      idsToDelete.slice(i, i + 450).forEach(id => batch.delete(doc(state.db, 'pembelianBahanMakanan', id)));
+      await batch.commit();
+    }
+    logActivity({ action: 'hapus', modul: 'Koperasi - Pembelian', ringkasan: `Bersihkan ${idsToDelete.length} catatan duplikat kosong (sisa klik backfill berulang)` });
+    alert(`Selesai. ${idsToDelete.length} catatan duplikat berhasil dihapus.`);
+  } catch (e) {
+    console.error('Gagal membersihkan duplikat', e);
+    alert('Gagal menghapus duplikat. Pastikan Anda sudah login.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Hapus Duplikat Sekarang'; }
+    renderPembelian(); // segarkan banner (jumlahnya sekarang harus 0 kalau berhasil)
+  }
+}
+
 function filteredPembelian() {
   const tampilkanArsip = document.getElementById('pembelianFilterArsip').checked;
   const dari = document.getElementById('pembelianFilterDari').value;
@@ -473,6 +521,17 @@ export function renderPembelian() {
   const arsipLabelEl = document.getElementById('pembelianFilterArsipLabel');
   if (arsipLabelEl) arsipLabelEl.textContent = `📁 Tampilkan Arsip (${arsipCount})`;
 
+  const duplikatBar = document.getElementById('pembelianDuplikatBar');
+  if (duplikatBar) {
+    const duplikatCount = cariDuplikatPembelian().length;
+    duplikatBar.classList.toggle('hidden', duplikatCount === 0);
+    const btnEl = document.getElementById('btnBersihkanDuplikatPembelian');
+    if (!btnEl.disabled) {
+      document.getElementById('pembelianDuplikatText').textContent =
+        `⚠️ Ditemukan ${duplikatCount} catatan duplikat kosong untuk barang PO yang sama (sisa klik tombol backfill berulang).`;
+    }
+  }
+
   if (items.length === 0) {
     logEl.innerHTML = `<div class="empty-state">Belum ada catatan pembelian untuk filter ini.</div>`;
     return;
@@ -660,6 +719,7 @@ export function downloadLaporanPembelian() {
 export function initPembelianEvents() {
   document.getElementById('btnSavePembelian').addEventListener('click', savePembelian);
   document.getElementById('btnTambahBarangPembelian').addEventListener('click', () => addItemRow());
+  document.getElementById('btnBersihkanDuplikatPembelian').addEventListener('click', bersihkanDuplikatPembelian);
   const { dari, sampai } = monthRange();
   document.getElementById('pembelianFilterDari').value = dari;
   document.getElementById('pembelianFilterSampai').value = sampai;
