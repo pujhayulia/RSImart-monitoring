@@ -655,15 +655,25 @@ export async function savePembelian() {
       });
       cancelEditPembelian();
     } else {
+      // Kalau barang ini sudah punya draft kosong dari PO (poId+poItemId sama, belum ada toko), lengkapi
+      // draft itu langsung -- JANGAN buat dokumen baru, supaya tidak dobel (lihat cariDuplikatPembelian()).
       const batch = writeBatch(state.db);
       rows.forEach(r => {
-        const ref = doc(collection(state.db, 'pembelianBahanMakanan'));
-        batch.set(ref, {
+        const itemPoId = poId ? r.poItemId : null;
+        const draftLama = itemPoId
+          ? state.lastPembelianItems.find(it => it.poId === poId && it.poItemId === itemPoId && !it.namaToko)
+          : null;
+        const data = {
           ...toko,
           namaBarang: r.namaBarang, jumlah: Number(r.jumlah), satuan: r.satuan, harga: r.harga ? Number(r.harga) : null,
-          poId, poItemId: poId ? r.poItemId : null,
-          createdAt: serverTimestamp(), createdBy: state.currentUserEmail,
-        });
+          poId, poItemId: itemPoId,
+        };
+        if (draftLama) {
+          batch.update(doc(state.db, 'pembelianBahanMakanan', draftLama.id), { ...data, updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail });
+        } else {
+          const ref = doc(collection(state.db, 'pembelianBahanMakanan'));
+          batch.set(ref, { ...data, createdAt: serverTimestamp(), createdBy: state.currentUserEmail });
+        }
       });
       await batch.commit();
       const totalHarga = rows.reduce((s, r) => s + (r.harga ? Number(r.harga) : 0), 0);
