@@ -482,7 +482,9 @@ async function simpanLengkapiSemua(poId) {
     hargaInputs.forEach(({ id, val }) => {
       batch.update(doc(state.db, 'pembelianBahanMakanan', id), {
         namaToko, noHpToko, alamatToko, namaPembeli, harga: Number(val),
-        updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
+        // Sama seperti di savePembelian(): draft ini createdAt-nya masih waktu PO dibuat, timpa
+        // dengan waktu pelengkapan supaya muncul di filter tanggal hari ini.
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail,
       });
     });
     await batch.commit();
@@ -671,7 +673,10 @@ export async function savePembelian() {
           poId, poItemId: itemPoId,
         };
         if (draftLama) {
-          batch.update(doc(state.db, 'pembelianBahanMakanan', draftLama.id), { ...data, updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail });
+          // Draft lama createdAt-nya = waktu PO dibuat (cuma placeholder), bukan waktu pembelian ini
+          // benar-benar disimpan -- timpa createdAt juga, supaya catatan ini muncul di filter tanggal
+          // hari ini, bukan "hilang" karena tersembunyi di tanggal PO dibuat.
+          batch.update(doc(state.db, 'pembelianBahanMakanan', draftLama.id), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: state.currentUserEmail });
         } else {
           const ref = doc(collection(state.db, 'pembelianBahanMakanan'));
           batch.set(ref, { ...data, createdAt: serverTimestamp(), createdBy: state.currentUserEmail });
