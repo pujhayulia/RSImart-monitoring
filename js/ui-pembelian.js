@@ -530,7 +530,7 @@ export function renderPembelian() {
     const duplikatCount = cariDuplikatPembelian().length;
     duplikatBar.classList.toggle('hidden', duplikatCount === 0);
     const btnEl = document.getElementById('btnBersihkanDuplikatPembelian');
-    if (!btnEl.disabled) {
+    if (btnEl && !btnEl.disabled) {
       document.getElementById('pembelianDuplikatText').textContent =
         `⚠️ Ditemukan ${duplikatCount} catatan duplikat kosong untuk barang PO yang sama (sisa klik tombol backfill berulang).`;
     }
