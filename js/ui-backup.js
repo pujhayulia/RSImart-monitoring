@@ -5,7 +5,6 @@
 import { collection, getDocs, doc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from './state.js';
 import { logActivity } from './activity-log.js';
-import { timestampToLocalDateIso } from './utils.js';
 
 const COLLECTIONS = [
   'rekap', 'pengiriman', 'lokasi', 'poSppg', 'pembelianBahanMakanan',
@@ -71,59 +70,63 @@ export async function downloadBackupSemuaData() {
   }
 }
 
-// ---------- Pangkas Data Lama (sebelum Juli 2026) ----------
-// Koleksi pembelianBahanMakanan membengkak jadi puluhan ribu dokumen (draft kosong + arsip lama), bikin
-// setiap buka halaman Pembelian menarik puluhan ribu baca Firestore sekaligus -- sampai kena limit baca
-// harian paket gratis (quota exceeded), jadi data yang baru disimpan pun tidak kelihatan. Pujha minta
-// dipangkas, sisakan Juli 2026 sampai sekarang saja. Supaya data lama tidak benar-benar hilang, backup
-// lengkap selalu diunduh dulu secara otomatis sebelum satu dokumen pun dihapus.
-const CUTOFF_PANGKAS = '2026-07-01';
+// ---------- Hapus Data Arsip Impor ----------
+// Koleksi pembelianBahanMakanan membengkak jadi puluhan ribu dokumen, bikin setiap buka halaman
+// Pembelian menarik puluhan ribu baca Firestore sekaligus -- sampai kena limit baca harian paket
+// gratis (quota exceeded), jadi data yang baru disimpan pun tidak kelihatan.
+// Pujha eksplisit minta: JANGAN berdasarkan tanggal (data yang diinput client lewat form biasa bisa
+// saja bertanggal lama juga) -- target HARUS cuma data hasil tombol "Import Arsip" (LPJ April-Agustus,
+// LPJ Sept-Okt, dll), ditandai field importBatch. Data yang diinput manual lewat "Catat PO Baru" /
+// "Catat Pembelian Baru" / dst TIDAK PERNAH diberi importBatch (lihat savePo()/savePembelian()), jadi
+// filter ini aman -- tidak mungkin ikut menghapus input client. Master Barang & Data Supplier sengaja
+// TIDAK disentuh sama sekali oleh alat ini (Pujha minta keduanya tetap ada apa adanya).
+// Backup lengkap selalu diunduh dulu secara otomatis sebelum satu dokumen pun dihapus.
 
-/** Tanggal efektif satu catatan Pembelian untuk keperluan pangkas -- sama seperti pembelianTanggalIso()
- * di ui-pembelian.js (tidak diimpor langsung supaya alat ini tetap berdiri sendiri, tidak bergantung
- * ke state.lastPoSppgItems yang mungkin belum lengkap): arsip impor pakai tanggal PO-nya, pembelian
- * biasa pakai createdAt. */
-function tanggalEfektifPembelian(it, poMap) {
-  if (it.importBatch && it.poId && poMap[it.poId] && poMap[it.poId].tanggalPo) return poMap[it.poId].tanggalPo;
-  return timestampToLocalDateIso(it.createdAt);
+/** true kalau sebuah catatan Pembelian berasal dari arsip impor -- ditandai importBatch langsung
+ * di dirinya sendiri, ATAU tertaut (poId) ke PO yang importBatch-nya terisi (draft yang dibuat
+ * otomatis dari PO arsip tidak selalu punya importBatch-nya sendiri). Sama persis logikanya dengan
+ * pembelianIsArsip() di ui-pembelian.js. */
+function pembelianDariArsip(it, poMap) {
+  if (it.importBatch) return true;
+  const po = it.poId ? poMap[it.poId] : null;
+  return !!(po && po.importBatch);
 }
 
 async function pangkasDataLama() {
   const btn = document.getElementById('btnPangkasDataLama');
   if (btn) { btn.disabled = true; btn.textContent = 'Membuat backup dulu...'; }
   try {
-    // 1) Backup otomatis dulu -- data lama dipindah ke file, bukan dihapus begitu saja tanpa jejak.
+    // 1) Backup otomatis dulu -- data arsip dipindah ke file, bukan dihapus begitu saja tanpa jejak.
     await downloadBackupSemuaData();
 
-    if (btn) btn.textContent = 'Menghitung data lama...';
+    if (btn) btn.textContent = 'Menghitung data arsip...';
     const [poDocs, pembelianDocs, distDocs, biayaDocs] = await Promise.all([
       fetchAll('poSppg'), fetchAll('pembelianBahanMakanan'), fetchAll('distribusiSppg'), fetchAll('biayaOperasional'),
     ]);
     const poMap = {};
     poDocs.forEach(po => { poMap[po.id] = po; });
 
-    const poLama = poDocs.filter(po => po.tanggalPo && po.tanggalPo < CUTOFF_PANGKAS);
-    const pembelianLama = pembelianDocs.filter(it => {
-      const tgl = tanggalEfektifPembelian(it, poMap);
-      return tgl && tgl < CUTOFF_PANGKAS;
-    });
-    const distLama = distDocs.filter(n => n.tanggalKirim && n.tanggalKirim < CUTOFF_PANGKAS);
-    const biayaLama = biayaDocs.filter(b => b.tanggal && b.tanggal < CUTOFF_PANGKAS);
-    const total = poLama.length + pembelianLama.length + distLama.length + biayaLama.length;
+    const poArsip = poDocs.filter(po => !!po.importBatch);
+    const pembelianArsip = pembelianDocs.filter(it => pembelianDariArsip(it, poMap));
+    const distArsip = distDocs.filter(n => !!n.importBatch);
+    const biayaArsip = biayaDocs.filter(b => !!b.importBatch);
+    const total = poArsip.length + pembelianArsip.length + distArsip.length + biayaArsip.length;
 
     if (total === 0) {
-      alert('Backup sudah terunduh. Tidak ada data sebelum 1 Juli 2026 yang ditemukan -- tidak ada yang perlu dipangkas.');
+      alert('Backup sudah terunduh. Tidak ada data arsip impor yang ditemukan -- tidak ada yang perlu dipangkas.');
       return;
     }
 
     const lanjut = confirm(
       `File backup lengkap sudah terunduh ke folder Download Anda -- simpan baik-baik.\n\n` +
-      `Akan MENGHAPUS PERMANEN dari database (semua bertanggal sebelum 1 Juli 2026):\n` +
-      `• ${poLama.length} PO dari SPPG\n` +
-      `• ${pembelianLama.length} catatan Pembelian Bahan Makanan\n` +
-      `• ${distLama.length} nota Distribusi ke SPPG\n` +
-      `• ${biayaLama.length} catatan Biaya Operasional\n\n` +
-      `Data Juli 2026 dan seterusnya TIDAK akan disentuh.\n\n` +
+      `Akan MENGHAPUS PERMANEN data hasil "Import Arsip" (LPJ April-Agustus, LPJ Sept-Okt, dll) dari database:\n` +
+      `• ${poArsip.length} PO dari SPPG\n` +
+      `• ${pembelianArsip.length} catatan Pembelian Bahan Makanan\n` +
+      `• ${distArsip.length} nota Distribusi ke SPPG\n` +
+      `• ${biayaArsip.length} catatan Biaya Operasional\n\n` +
+      `Data yang diinput MANUAL oleh client/staf lewat form biasa (PO, Pembelian, Distribusi, Biaya Operasional) ` +
+      `TIDAK akan disentuh sama sekali, berapa pun lamanya -- hanya data hasil impor arsip yang dihapus. ` +
+      `Master Barang & Data Supplier juga tidak disentuh.\n\n` +
       `Lanjutkan hapus permanen?`
     );
     if (!lanjut) {
@@ -142,22 +145,22 @@ async function pangkasDataLama() {
         if (btn) btn.textContent = `Menghapus ${selesai}/${total}...`;
       }
     };
-    await hapusSemua('poSppg', poLama);
-    await hapusSemua('pembelianBahanMakanan', pembelianLama);
-    await hapusSemua('distribusiSppg', distLama);
-    await hapusSemua('biayaOperasional', biayaLama);
+    await hapusSemua('poSppg', poArsip);
+    await hapusSemua('pembelianBahanMakanan', pembelianArsip);
+    await hapusSemua('distribusiSppg', distArsip);
+    await hapusSemua('biayaOperasional', biayaArsip);
 
     logActivity({
       action: 'hapus',
       modul: 'Backup Data',
-      ringkasan: `Pangkas data sebelum 1 Juli 2026: ${poLama.length} PO, ${pembelianLama.length} pembelian, ${distLama.length} distribusi, ${biayaLama.length} biaya operasional (backup sudah diunduh sebelumnya)`,
+      ringkasan: `Pangkas data arsip impor: ${poArsip.length} PO, ${pembelianArsip.length} pembelian, ${distArsip.length} distribusi, ${biayaArsip.length} biaya operasional (backup sudah diunduh sebelumnya; data input manual tidak disentuh)`,
     });
-    alert(`Selesai. ${total} dokumen lama (sebelum Juli 2026) sudah dihapus permanen. Data Juli 2026 dan seterusnya tetap utuh. Backup file-nya ada di folder Download Anda.`);
+    alert(`Selesai. ${total} dokumen arsip impor sudah dihapus permanen. Semua data yang diinput manual (client/staf) tetap utuh. Backup file-nya ada di folder Download Anda.`);
   } catch (e) {
     console.error(e);
     alert('Gagal memangkas data. Pastikan Anda sudah login, lalu coba lagi. (Kalau errornya soal kuota Firestore habis, tunggu reset atau upgrade ke Blaze dulu baru coba lagi.)');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🗑 Pangkas Data Sebelum Juli 2026'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 Hapus Data Arsip Impor'; }
   }
 }
 
