@@ -1423,6 +1423,13 @@
             </div>
             <button type="button" class="btn-ghost" id="btnDownloadBackup">⬇ Download Backup Semua Data (JSON)</button>
           </div>
+          <div class="backup-box backup-box--danger">
+            <div>
+              <b>⚠️ Pangkas Data Lama (sebelum Juli 2026)</b>
+              <p>Data PO, Pembelian, Distribusi &amp; Biaya Operasional sebelum 1 Juli 2026 dihapus permanen dari database — supaya halaman lebih cepat &amp; tidak boros kuota. File backup lengkap otomatis ter-download dulu sebelum apa pun dihapus. Data Juli 2026 dan seterusnya TIDAK disentuh.</p>
+            </div>
+            <button type="button" class="btn-danger" id="btnPangkasDataLama">🗑 Pangkas Data Sebelum Juli 2026</button>
+          </div>
           <div class="date-filter-row activity-filter-row">
             <select id="aktivitasFilterModul" aria-label="Filter modul"></select>
             <select id="aktivitasFilterAksi" aria-label="Filter aksi">
@@ -1446,6 +1453,6 @@
   </div>
 </div><!-- /mainApp -->
 
-<script type="module" src="js/main.js?v=74"></script>
+<script type="module" src="js/main.js?v=75"></script>
 </body>
 </html>

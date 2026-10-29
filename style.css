@@ -431,6 +431,9 @@ select:focus, input:focus, textarea:focus{
 .backup-box b{font-size:13.5px;}
 .backup-box p{font-size:12px;color:var(--muted);margin:3px 0 0;max-width:480px;}
 .backup-box .btn-ghost{flex-shrink:0;}
+.backup-box--danger{border-color:#F3B9B9;background:#FFF7F7;}
+.backup-box .btn-danger{flex-shrink:0;background:#FDECEC;border:1px solid #F3B9B9;color:#B5432E;font-weight:600;cursor:pointer;padding:9px 16px;border-radius:8px;font-family:inherit;font-size:13px;}
+.backup-box .btn-danger:disabled{opacity:.6;cursor:default;}
 
 .action-needed-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px;}
 .action-pill{
