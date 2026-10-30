@@ -186,11 +186,14 @@ function fieldEl(name) {
 export function watchPembelian(onChange) {
   const logEl = document.getElementById('pembelianLog');
   logEl.innerHTML = `<div class="empty-state">Memuat data pembelian...</div>`;
-  // Limit digenerosi (sebelumnya 500) -- koleksi ini sekarang berisi ribuan draft (satu dokumen per
-  // barang PO, bukan per PO), jadi batas kecil membuat state.lastPembelianItems TIDAK lengkap dan
-  // merusak logika "sudah ada pembelian belum" (poItemBelumPunyaPembelian, itemRealisasi/margin) --
-  // item lama yang kepotong dari cache dikira belum punya catatan padahal sebenarnya sudah ada.
-  const q = query(collection(state.db, 'pembelianBahanMakanan'), orderBy('createdAt', 'desc'), limit(20000));
+  // PENTING -- limit() ini menentukan jumlah baca Firestore setiap kali situs dibuka/refresh (paket
+  // gratis cuma 50.000 baca/hari total, lihat insiden 2026-10-28/30: koleksi ini sempat ~39.000+
+  // dokumen -- kebanyakan draft kosong arsip impor + draft kosong lama yang tak kunjung dilengkapi --
+  // bikin SEKALI buka situs saja sudah menghabiskan hampir semua jatah harian). Diturunkan dari 20000
+  // ke 6000 setelah pembersihan arsip impor -- tetap jauh lebih tinggi dari jumlah data riil sehari-hari
+  // supaya logika "sudah ada pembelian belum" (poItemBelumPunyaPembelian, itemRealisasi/margin, lihat
+  // ui-po-sppg.js) tetap lengkap & akurat, tapi membatasi kerusakan kalau koleksi membengkak lagi.
+  const q = query(collection(state.db, 'pembelianBahanMakanan'), orderBy('createdAt', 'desc'), limit(6000));
   if (state.pembelianUnsub) state.pembelianUnsub();
   state.pembelianUnsub = onSnapshot(q, (qs) => {
     state.lastPembelianItems = [];

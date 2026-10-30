@@ -1231,11 +1231,14 @@ function pembelianUntukPoItem(poId, itemId) {
  * menambahkan draft ke PO lama (dibuat sebelum fitur draft-otomatis ini ada). Barang yang sudah punya
  * minimal satu catatan (draft ataupun yang sudah lengkap) dilewati, supaya tidak dobel. */
 function poItemBelumPunyaPembelian() {
-  // state.lastPembelianItems dibatasi limit() di watchPembelian() -- kalau koleksinya sampai sebesar
-  // itu lagi suatu saat nanti, fungsi ini bisa salah mengira barang lama "belum ada catatannya" padahal
-  // sebenarnya ada (cuma kepotong dari cache). Peringatkan di console supaya ketahuan, bukan diam-diam salah.
-  if (state.lastPembelianItems.length >= 19500) {
-    console.warn(`state.lastPembelianItems sudah ${state.lastPembelianItems.length} dokumen, mendekati batas limit() di watchPembelian() -- poItemBelumPunyaPembelian() bisa mulai salah hitung lagi. Naikkan limit-nya.`);
+  // state.lastPembelianItems dibatasi limit() di watchPembelian() (diturunkan ke 6000 pada 2026-10-30
+  // untuk hemat kuota baca Firestore harian -- lihat insiden di watchPembelian()) -- kalau koleksinya
+  // sampai sebesar itu lagi suatu saat nanti, fungsi ini bisa salah mengira barang lama "belum ada
+  // catatannya" padahal sebenarnya ada (cuma kepotong dari cache). Peringatkan di console supaya
+  // ketahuan, bukan diam-diam salah -- dan kalau ini muncul, pertimbangkan bersihkan draft kosong lama
+  // dulu (lihat "Hapus Data Arsip Impor" / cek draft manual yang menumpuk) sebelum menaikkan limit lagi.
+  if (state.lastPembelianItems.length >= 5700) {
+    console.warn(`state.lastPembelianItems sudah ${state.lastPembelianItems.length} dokumen, mendekati batas limit() di watchPembelian() -- poItemBelumPunyaPembelian() bisa mulai salah hitung lagi.`);
   }
   const hasil = [];
   state.lastPoSppgItems.forEach(po => {
